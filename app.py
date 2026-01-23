@@ -1,59 +1,55 @@
 """
-Gradio app with chat and image interface using Qwen3-VL model.
-Uses the aiops-py312 conda environment.
+Gradio frontend for Qwen3-VL Chat application.
+Communicates with model_server via REST API.
 """
 
 import gradio as gr
 from PIL import Image
-from pathlib import Path
-from datetime import datetime
 from typing import Optional
-import torch
-from transformers import (
-    Qwen3VLForConditionalGeneration,
-    AutoProcessor,
-    BitsAndBytesConfig
-)
+import requests
+import base64
+import io
+import time
 
-# Model configuration
-MODEL_PATH = Path("/root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct")
-MAX_HISTORY = 5
-MAX_NEW_TOKENS = 512
+# Model server configuration
+MODEL_SERVER_URL = "http://localhost:8000"
+LOAD_MODEL_ENDPOINT = f"{MODEL_SERVER_URL}/load_model"
+CHAT_ENDPOINT = f"{MODEL_SERVER_URL}/chat"
+CLEAR_HISTORY_ENDPOINT = f"{MODEL_SERVER_URL}/clear_history"
+HEALTH_ENDPOINT = f"{MODEL_SERVER_URL}/health"
 
-# Global variables for model and processor
-model = None
-processor = None
-conversation_history = []  # For Qwen model
-gradio_chat_history = []   # For Gradio UI (messages format)
+# Global state
+chat_history = []
 
 
-def load_model():
-    """Load the Qwen3-VL model with quantization."""
-    global model, processor
-    
-    if model is not None:
-        return "Model already loaded"
-    
-    print("Loading Qwen3-VL model...")
-    
-    quantization_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4"
-    )
-    
-    model = Qwen3VLForConditionalGeneration.from_pretrained(
-        str(MODEL_PATH),
-        quantization_config=quantization_config,
-        device_map="auto",
-        attn_implementation="sdpa",
-    ).eval()
-    
-    processor = AutoProcessor.from_pretrained(str(MODEL_PATH))
-    
-    print("Model loaded successfully!")
-    return "Model loaded successfully"
+def check_server_health():
+    """Check if model server is running."""
+    try:
+        response = requests.get(HEALTH_ENDPOINT, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return data["model_loaded"], data["status"]
+        return False, "Server error"
+    except requests.exceptions.ConnectionError:
+        return False, "Server not running"
+    except Exception as e:
+        return False, f"Error: {str(e)}"
+
+
+def load_model_remote():
+    """Load model on the remote server."""
+    try:
+        response = requests.post(LOAD_MODEL_ENDPOINT, json={}, timeout=300)
+        if response.status_code == 200:
+            data = response.json()
+            return data["message"]
+        return f"Error: {response.json().get('detail', 'Unknown error')}"
+    except requests.exceptions.Timeout:
+        return "Error: Model loading timed out"
+    except requests.exceptions.ConnectionError:
+        return "Error: Cannot connect to model server"
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 def process_chat_and_image(
@@ -62,163 +58,127 @@ def process_chat_and_image(
     chat_history: list = None
 ) -> tuple:
     """
-    Process chat message and image input using Qwen3-VL model.
+    Send chat message and image to model server.
     
     Args:
         message: User's chat message
-        image: Optional image uploaded by user
-        chat_history: Conversation history (Gradio format - messages)
+        image: Optional image
+        chat_history: Conversation history
     
     Returns:
-        Updated chat history and response
+        Updated chat history and empty input
     """
-    global model, processor, conversation_history, gradio_chat_history
-    
-    if model is None or processor is None:
-        error_response = "Error: Model not loaded. Please load the model first."
-        if chat_history is None:
-            chat_history = []
-        chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": error_response})
-        gradio_chat_history = chat_history
-        return chat_history, ""
-    
-    if not message.strip():
-        error_response = "Error: Please enter a message"
-        if chat_history is None:
-            chat_history = []
-        chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": error_response})
-        gradio_chat_history = chat_history
-        return chat_history, ""
-    
     if chat_history is None:
         chat_history = []
     
-    start_time = datetime.now()
-    
-    try:
-        # Build the content with text and optional image
-        content = [{"type": "text", "text": message}]
-        
-        if image is not None:
-            content.append({"type": "image"})
-        
-        # Add user message to internal conversation history (Qwen format)
-        conversation_history.append({
-            "role": "user",
-            "content": content
-        })
-        
-        # Slide context: keep only recent messages
-        if len(conversation_history) > MAX_HISTORY:
-            conversation_history = conversation_history[-MAX_HISTORY:]
-        
-        # Prepare inputs - handle image if provided
-        if image is not None:
-            inputs = processor.apply_chat_template(
-                conversation_history,
-                images=[image],
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-                return_tensors="pt"
-            )
-        else:
-            inputs = processor.apply_chat_template(
-                conversation_history,
-                tokenize=True,
-                add_generation_prompt=True,
-                return_dict=True,
-                return_tensors="pt"
-            )
-        
-        inputs = inputs.to(model.device)
-        
-        # Inference
-        generated_ids = model.generate(
-            **inputs,
-            max_new_tokens=MAX_NEW_TOKENS,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9
-        )
-        
-        generated_ids_trimmed = [
-            out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
-        ]
-        
-        output_text = processor.batch_decode(
-            generated_ids_trimmed,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=False
-        )
-        
-        response = output_text[0]
-        end_time = datetime.now()
-        response_time = (end_time - start_time).total_seconds()
-        
-        # Add assistant response to internal conversation history
-        conversation_history.append({
-            "role": "assistant",
-            "content": [{"type": "text", "text": response}]
-        })
-        
-        # Add timing info to display
-        display_response = f"{response}\n\n⏱️ Response time: {response_time:.2f}s"
-        
-        # Add to Gradio chat history (messages format)
-        chat_history.append({"role": "user", "content": message})
-        chat_history.append({"role": "assistant", "content": display_response})
-        gradio_chat_history = chat_history
-        
-        return chat_history, ""
-    
-    except Exception as e:
-        error_msg = f"Error processing request: {str(e)}"
-        print(f"Error: {error_msg}")
-        import traceback
-        traceback.print_exc()
+    if not message.strip():
+        error_msg = "Error: Please enter a message"
         chat_history.append({"role": "user", "content": message})
         chat_history.append({"role": "assistant", "content": error_msg})
-        gradio_chat_history = chat_history
+        return chat_history, ""
+    
+    # Check server health
+    model_loaded, status = check_server_health()
+    if not model_loaded:
+        error_msg = "Error: Model not loaded on server. Click 'Load Model' first."
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": error_msg})
+        return chat_history, ""
+    
+    try:
+        # Prepare image data
+        image_base64 = None
+        if image is not None:
+            buffered = io.BytesIO()
+            image.save(buffered, format="PNG")
+            image_base64 = base64.b64encode(buffered.getvalue()).decode()
+        
+        # Send request to model server
+        start_time = time.time()
+        response = requests.post(
+            CHAT_ENDPOINT,
+            json={
+                "message": message,
+                "image_base64": image_base64
+            },
+            timeout=120
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            response_text = data["response"]
+            response_time = data["response_time"]
+            
+            # Format response with timing
+            display_response = f"{response_text}\n\n⏱️ Response time: {response_time:.2f}s"
+            
+            # Add to chat history
+            chat_history.append({"role": "user", "content": message})
+            chat_history.append({"role": "assistant", "content": display_response})
+            
+            return chat_history, ""
+        else:
+            error_msg = f"Server error: {response.json().get('detail', 'Unknown error')}"
+            chat_history.append({"role": "user", "content": message})
+            chat_history.append({"role": "assistant", "content": error_msg})
+            return chat_history, ""
+    
+    except requests.exceptions.Timeout:
+        error_msg = "Error: Request timed out"
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": error_msg})
+        return chat_history, ""
+    except requests.exceptions.ConnectionError:
+        error_msg = "Error: Cannot connect to model server. Make sure it's running."
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": error_msg})
+        return chat_history, ""
+    except Exception as e:
+        error_msg = f"Error: {str(e)}"
+        chat_history.append({"role": "user", "content": message})
+        chat_history.append({"role": "assistant", "content": error_msg})
         return chat_history, ""
 
 
 def clear_chat():
-    """Clear chat history."""
-    global conversation_history, gradio_chat_history
-    conversation_history = []
-    gradio_chat_history = []
+    """Clear chat history on both frontend and server."""
+    global chat_history
+    try:
+        requests.post(CLEAR_HISTORY_ENDPOINT, timeout=5)
+    except:
+        pass
+    chat_history = []
     return []
 
 
 def main():
     """Create and launch the Gradio interface."""
-    global model, processor
+    global chat_history
     
-    with gr.Blocks(title="Qwen3-VL Chat & Image App") as app:
+    with gr.Blocks(title="Qwen3-VL Chat") as app:
         gr.Markdown("# Qwen3-VL Chat & Image Processing")
-        gr.Markdown("An advanced multimodal AI assistant that understands both text and images.")
+        gr.Markdown("Chat with Qwen3-VL model via REST API")
         
-        # Model status
+        # Server status
         with gr.Row():
-            model_status = gr.Textbox(label="Model Status", value="Not loaded", interactive=False)
+            server_status = gr.Textbox(
+                label="Server Status",
+                value="Checking...",
+                interactive=False
+            )
             load_model_btn = gr.Button("Load Model", variant="primary")
         
         gr.Markdown("---")
         
         with gr.Row():
             with gr.Column(scale=3):
-                # Chat interface
                 chatbot = gr.Chatbot(
                     label="Chat History",
                     height=500,
                     show_label=True
                 )
-                
+            
             with gr.Column(scale=1):
-                # Image interface
                 image_input = gr.Image(
                     type="pil",
                     label="Upload Image",
@@ -228,7 +188,7 @@ def main():
         # Input section
         with gr.Row():
             message_input = gr.Textbox(
-                placeholder="Enter your message... You can also upload an image to describe it.",
+                placeholder="Enter your message...",
                 label="Message",
                 lines=3
             )
@@ -237,15 +197,22 @@ def main():
             submit_btn = gr.Button("Send", variant="primary", scale=2)
             clear_btn = gr.Button("Clear Chat", scale=1)
         
-        # Model loading
-        def load_model_clicked():
-            status = load_model()
+        # Load model button
+        def on_load_model():
+            status = load_model_remote()
             return status
         
         load_model_btn.click(
-            fn=load_model_clicked,
-            outputs=[model_status]
+            fn=on_load_model,
+            outputs=[server_status]
         )
+        
+        # Check server status on load
+        def check_status():
+            model_loaded, status = check_server_health()
+            return f"Status: {status} | Model: {'Loaded' if model_loaded else 'Not loaded'}"
+        
+        app.load(check_status, outputs=[server_status])
         
         # Chat submission
         submit_btn.click(
@@ -260,23 +227,12 @@ def main():
             outputs=[chatbot]
         )
         
-        # Example usage
-        gr.Examples(
-            examples=[
-                ["What can you do?", None],
-                ["Hello! How are you today?", None],
-                ["Can you help me understand this image?", None],
-            ],
-            inputs=[message_input, image_input]
-        )
-        
         gr.Markdown("---")
         gr.Markdown(
-            "**Note:** Load the model first by clicking 'Load Model'. "
-            "The model supports both text and image inputs for multimodal understanding."
+            "**Note:** Model server must be running on http://localhost:8000\n\n"
+            "Start it with: `python model_server.py`"
         )
     
-    # Launch the app
     app.launch(
         server_name="0.0.0.0",
         server_port=7860,

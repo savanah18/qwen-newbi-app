@@ -1,48 +1,70 @@
 # Qwen3-VL Chat & Image Processing App
 
-A simple multimodal AI chat application built with [Gradio](https://www.gradio.app/) and [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct) that can process text messages and images.
+A multimodal AI chat application built with [Gradio](https://www.gradio.app/) and [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct) that can process text messages and images. The application uses GPU acceleration with 4-bit quantization for efficient inference.
 
-> ⚠️ **Learning Opportunity**: This application is created for educational and learning purposes only. It demonstrates how to integrate multimodal AI models with web interfaces using Gradio.
+![Sample Application](docs/figures/poc.png)
+
+> ⚠️ **Learning Opportunity**: This application is created for educational and learning purposes only. It demonstrates how to integrate multimodal AI models with web interfaces using Gradio and REST APIs.
+
+## Architecture
+
+The application uses a **disaggregated architecture** with separate frontend and backend services:
+
+- **Frontend** (`app.py`): Gradio web UI running on port 7860
+- **Backend** (`model_server.py`): FastAPI model server running on port 8000
+
+The frontend communicates with the backend via REST API, enabling scalability and independent service management.
 
 ## Features
 
-- Text and image chat interface
-- Gradio web UI
-- Conversation history (last 5 messages)
-- Response timing information
-
-## Requirements
-
-- **Python**: 3.12+
-- **Conda Environment**: `aiops-py312`
-- **GPU**: NVIDIA GPU with sufficient VRAM (recommended 8GB+ for smooth operation)
-
-## Dependencies
-
-All dependencies are listed in `requirements.txt`:
+- **Multimodal Chat Interface**: Text and image processing in one unified interface
+- **Disaggregated Architecture**: Separate frontend (Gradio) and backend (FastAPI) services
+- **GPU-Accelerated Inference**: Automatic GPU detection with `device_map="auto"`
+- **4-bit Quantization**: Memory-efficient model loading using BitsAndBytes
+- **Conversation History**: Maintains context of last 5 messages
+- **Response Timing**: Real-time performance metrics
+- **Health Monitoring**: Built-in health checks for model server
+- **Standalone Mode**: Option to run Gradio without separate backend (`full-app.py`)
+- **API Documentation**: Auto-generated interactive API docs via FastAPI
 
 ## Setup
 
-### 1. Activate Conda Environment
+### Prerequisites
 
-```bash
-conda activate aiops-py312
-```
+- NVIDIA GPU with CUDA support (recommended: 12GB+ VRAM)
+- Conda environment with Python 3.12
+- Qwen3-VL-8B-Instruct model downloaded
 
-### 2. Install Dependencies (if not already installed)
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Verify Qwen Model Path
+Or use conda:
+```bash
+conda run -n aiops-py312 pip install -r requirements.txt
+```
+
+Required packages:
+- `transformers` - Hugging Face transformers library
+- `torch` - PyTorch with CUDA support
+- `gradio` - Web UI framework
+- `fastapi` - REST API backend
+- `uvicorn` - ASGI server
+- `bitsandbytes` - 4-bit quantization
+- `accelerate` - Model parallelism
+- `pillow` - Image processing
+- `requests` - HTTP client
+
+### 2. Verify Qwen Model Path
 
 The app expects the Qwen3-VL model at:
 ```
 /root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct
 ```
 
-If your model is located elsewhere, update the `MODEL_PATH` variable in `app.py`:
+To use a different path, update `MODEL_PATH` in `model_server.py`:
 
 ```python
 MODEL_PATH = Path("/path/to/your/Qwen3-VL-8B-Instruct")
@@ -50,136 +72,149 @@ MODEL_PATH = Path("/path/to/your/Qwen3-VL-8B-Instruct")
 
 ## Usage
 
-### Start the Application
+### Option 1: Start Both Services (Recommended)
 
+Use the provided startup script:
+
+```bash
+./start.sh
+```
+
+This will:
+- Clean up any existing processes
+- Start the model server on port 8000
+- Start the Gradio frontend on port 7860
+- Save logs to `logs/` directory
+- Show real-time status updates
+
+### Option 2: Standalone Gradio App
+
+Run the all-in-one version without a separate backend:
+
+```bash
+conda run -n aiops-py312 python full-app.py
+```
+
+This version includes the model directly in the Gradio app (simpler but less scalable).
+
+### Option 3: Start Services Manually
+
+**Terminal 1 - Start Model Server:**
+```bash
+conda run -n aiops-py312 python model_server.py
+```
+
+**Terminal 2 - Start Gradio Frontend:**
 ```bash
 conda run -n aiops-py312 python app.py
 ```
 
-The app will start and display:
-```
-* Running on local URL:  http://0.0.0.0:7860
-```
+### Access the Application
 
-### Access the Web Interface
-
-Open your browser and navigate to:
-- **Local**: `http://localhost:7860`
-- **Remote**: `http://<server-ip>:7860`
+- **Frontend**: http://localhost:7860
+- **API Docs**: http://localhost:8000/docs
 
 ### Using the App
 
-1. **Load the Model**: Click the "Load Model" button to initialize Qwen3-VL
-   - This may take 30-60 seconds on first load
-   - Status will update when complete
+1. Open the Gradio interface at http://localhost:7860
+2. The model is automatically loaded on server startup (wait 30-60 seconds on first run)
+3. Once the server is ready, you can start sending messages
+4. Optionally upload an image to go along with your message
+5. View responses with timing information
 
-2. **Send Messages**: 
-   - Type your message in the text input box
-   - Optionally upload an image using the image upload panel
-   - Click "Send" to process
+## API Endpoints
 
-3. **Chat Features**:
-   - **Text Only**: Send text messages for general conversation
-   - **With Image**: Upload an image and ask questions about it
-   - **Conversation Context**: The app maintains the last 5 exchanges for context
-   - **Clear Chat**: Click "Clear Chat" to reset the conversation
+The FastAPI backend provides these endpoints:
 
-## Architecture
-
-### Model Configuration
-
-The app uses the following optimizations:
-
-- **Quantization**: 4-bit quantization with BFloat16 compute dtype
-- **Attention**: SDPA (Scaled Dot Product Attention) for faster inference
-- **Device Mapping**: Automatic GPU/CPU distribution (`device_map="auto"`)
-
-### Conversation Management
-
-- **Internal History**: Uses Qwen-compatible message format for the model
-- **Display History**: Uses Gradio messages format for the web UI
-- **Context Sliding**: Keeps only the last 5 message pairs to reduce token count
-
-## Configuration
-
-Key parameters you can adjust in `app.py`:
-
-```python
-MAX_HISTORY = 5              # Number of recent message pairs to keep
-MAX_NEW_TOKENS = 512         # Maximum tokens to generate per response
-temperature = 0.7            # Sampling temperature (0.0-1.0)
-top_p = 0.9                  # Nucleus sampling parameter
-```
-
-## Troubleshooting
-
-### Model Not Loading
-- Verify the model path exists
-- Check GPU memory availability: `nvidia-smi`
-- Ensure PyTorch is installed correctly
-
-### Out of Memory (OOM)
-- Reduce `MAX_NEW_TOKENS`
-- Reduce `MAX_HISTORY`
-- Try running on a machine with more VRAM
-
-### Slow Responses
-- Normal for first inference (warm-up)
-- Subsequent responses should be faster
-- Check GPU utilization: `nvidia-smi`
-
-### Port Already in Use
-- Change the port in the launch settings in `app.py`
-- Or kill the process: `lsof -ti:7860 | xargs kill -9`
-
-## Example Usage
-
-### Text Conversation
-```
-User: What are the benefits of machine learning?
-Assistant: [Detailed response about ML benefits with timing]
-```
-
-### Image Understanding
-```
-User: [Upload an image] What's in this image?
-Assistant: [Description of the image content]
-```
-
-## Performance Notes
-
-- **First Load**: 25-60 seconds (model initialization)
-- **First Inference**: 10-20 seconds (warm-up)
-- **Subsequent Inference**: 3-8 seconds (depends on response length)
-
-Response times are displayed at the end of each message.
+- `GET /health` - Check server and model status
+- `POST /load_model` - Load the Qwen3-VL model
+- `POST /chat` - Send a message with optional image
+- `POST /clear_history` - Clear conversation history
+- `GET /history` - Get current conversation history
+- `GET /docs` - Interactive API documentation
 
 ## File Structure
 
 ```
 newbie-app/
-├── app.py              # Main Gradio application
-├── requirements.txt    # Python dependencies
-└── README.md          # This file
+├── app.py                # Gradio frontend (REST client)
+├── full-app.py           # Standalone Gradio app (no separate backend)
+├── model_server.py       # FastAPI backend (model inference)
+├── start.sh             # Startup script for both services
+├── requirements.txt     # Python dependencies
+├── logs/                # Log files (auto-created)
+│   ├── model_server.log
+│   └── frontend.log
+└── README.md           # This file
 ```
+
+## Configuration
+
+Key parameters in `model_server.py`:
+
+```python
+MAX_HISTORY = 5              # Conversation history to keep
+MAX_NEW_TOKENS = 512         # Max tokens per response
+temperature = 0.7            # Response randomness
+top_p = 0.9                  # Nucleus sampling
+```
+
+## Troubleshooting
+
+### Model Server Not Starting
+- **Check model path exists**: `ls /root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct`
+- **Check GPU memory**: `nvidia-smi` (requires ~8-10GB VRAM with 4-bit quantization)
+- **Verify dependencies**: `conda run -n aiops-py312 pip list | grep -E "torch|transformers|bitsandbytes"`
+- **Check CUDA**: `python -c "import torch; print(torch.cuda.is_available())"`
+
+### Frontend Cannot Connect to Server
+- Ensure model server is running on port 8000: `curl http://localhost:8000/health`
+- Check firewall settings: `sudo ufw status`
+- Verify localhost access: `netstat -tlnp | grep 8000`
+- Check logs: `tail -f logs/model_server.log`
+
+### Out of Memory (OOM)
+- **Reduce max tokens**: Lower `MAX_NEW_TOKENS` in config (e.g., 256)
+- **Reduce history**: Lower `MAX_HISTORY` to 3 or fewer
+- **Close other GPU processes**: `nvidia-smi` to check what's using VRAM
+- **Ensure quantization**: Verify 4-bit quantization is enabled
+- **Use smaller batch**: The app processes one request at a time by default
+
+### Port Already in Use
+
+Model Server (8000):
+```bash
+lsof -ti:8000 | xargs kill -9
+```
+
+Frontend (7860):
+```bash
+lsof -ti:7860 | xargs kill -9
+```
+
+Or use the start script which handles cleanup automatically.
+
+### Slow Inference
+- **First run is slow**: Model loading takes 30-60 seconds
+- **Check GPU usage**: `nvidia-smi` should show GPU utilization
+- **Verify GPU inference**: Model should use CUDA, not CPU
+- **Review logs**: Check `logs/model_server.log` for warnings
 
 ## References
 
-- [Qwen3-VL Model](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct)
-- [Gradio Documentation](https://www.gradio.app/docs)
-- [Hugging Face Transformers](https://huggingface.co/docs/transformers)
-- [BitsAndBytes Quantization](https://github.com/TimDettmers/bitsandbytes)
+- [Qwen3-VL Model](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct) - Vision-Language model from Qwen
+- [Gradio Documentation](https://www.gradio.app/docs) - Web UI framework
+- [FastAPI Documentation](https://fastapi.tiangolo.com/) - Modern REST API framework
+- [Hugging Face Transformers](https://huggingface.co/docs/transformers) - Model loading and inference
+- [BitsAndBytes](https://github.com/TimDettmers/bitsandbytes) - 4-bit quantization library
 
-## License
+## Notes
 
-This project uses models and libraries under their respective licenses. Please refer to the model card and library documentation for details.
-
-## Support
-
-For issues or questions:
-1. Check the Troubleshooting section
-2. Review the error messages in the terminal
-3. Verify all dependencies are installed correctly
+- The application uses **4-bit quantization** to reduce VRAM requirements from ~32GB to ~8-10GB
+- **GPU acceleration** is automatic via `device_map="auto"` in model loading
+- Model loads on server startup - expect 30-60 second initialization time
+- Logs are stored in `logs/` directory for debugging
+- The `full-app.py` version is simpler but less scalable than the client-server architecture
 
 ---
 
