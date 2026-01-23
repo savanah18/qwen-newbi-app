@@ -1,0 +1,42 @@
+{
+  "name": "dsa-agent",
+  "displayName": "DSA Agent - Data Structures & Algorithms",
+  "description": "Agentic assistant for mastering data structures, algorithms, and competitive programming.",
+  "version": "0.1.0",
+  "publisher": "your-publisher",
+  "engines": {
+    "vscode": "^1.87.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onCommand:dsaAgent.helloWorld",
+    "onCommand:dsaAgent.openChat"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "dsaAgent.helloWorld",
+        "title": "DSA Agent: Start"
+      },
+      {
+        "command": "dsaAgent.openChat",
+        "title": "DSA Agent: Open Assistant"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "echo 'No lint configured'",
+    "package": "vsce package || echo 'Install vsce to package'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.87.0",
+    "typescript": "^5.3.3"
+  }
+}

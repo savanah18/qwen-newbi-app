@@ -1,44 +1,196 @@
-# Qwen3-VL Chat & Image Processing App
+# DSA Agent - Data Structures & Algorithms Learning Platform
 
-A multimodal AI chat application built with [Gradio](https://www.gradio.app/) and [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct) that can process text messages and images. The application uses GPU acceleration with 4-bit quantization for efficient inference.
+**DSA Agent** is an agentic VS Code extension for mastering data structures and algorithms. It brings AI-powered learning directly into your editor, supporting competitive programming, technical interview prep, and algorithm mastery.
 
-![Sample Application](docs/figures/poc.png)
+Built with [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), a powerful multimodal AI model running on GPU-accelerated inference with 4-bit quantization for efficiency.
 
-> ⚠️ **Learning Opportunity**: This application is created for educational and learning purposes only. It demonstrates how to integrate multimodal AI models with web interfaces using Gradio and REST APIs.
+> ⚠️ **Learning Opportunity**: This project demonstrates building intelligent AI-powered VS Code extensions with disaggregated REST API backends, enabling multi-client support and scalable inference.
+
+> 📝 **Note**: This README is AI-generated. Cleanup for ambiguous and vague information is pending. Please take it with a grain of salt and report any inaccuracies.
 
 ## Architecture
 
-The application uses a **disaggregated architecture** with separate frontend and backend services:
+The platform uses a **disaggregated architecture** with backend model server and multiple client frontends:
 
-- **Frontend** (`app.py`): Gradio web UI running on port 7860
-- **Backend** (`model_server.py`): FastAPI model server running on port 8000
+- **Backend** (`agent/serving/model_server.py`): FastAPI model server running on port 8000, handles all AI inference
+- **VS Code Extension** (`agent/client/extensions/vscode`): DSA Agent extension providing editor-integrated learning
 
-The frontend communicates with the backend via REST API, enabling scalability and independent service management.
+The extension communicates with the backend via REST API, enabling scalability and potential for additional clients (CLI, mobile, etc.).
 
 ## Features
 
-- **Multimodal Chat Interface**: Text and image processing in one unified interface
-- **Disaggregated Architecture**: Separate frontend (Gradio) and backend (FastAPI) services
+- **VS Code Extension (DSA Agent)**: Agentic assistant integrated directly into your editor
+- **Agentic Chat**: AI-powered responses on algorithm and data structure concepts
+- **Multi-Domain Support**: Covers algorithm design, data structures, complexity analysis, interview prep
+- **Server Health Monitoring**: Built-in health checks and model status display
 - **Flexible Loading Strategies**: Choose between native transformers or high-performance vLLM
-- **Multiple Quantization Options**: int4, int8 (native) or AWQ/GPTQ (vLLM)
+- **Multiple Quantization Options**: int4, int8 (native) or AWQ/GPTQ (vLLM) for memory efficiency
 - **GPU-Accelerated Inference**: Automatic GPU detection and optimization
-- **Configurable Attention**: SDPA, Eager, or Flash Attention 2 support (native mode)
-- **Conversation History**: Maintains context of last 5 messages
+- **Configurable Attention Mechanisms**: SDPA, Eager, or Flash Attention 2 support
 - **Response Timing**: Real-time performance metrics
-- **Health Monitoring**: Built-in health checks for model server
-- **Standalone Mode**: Option to run Gradio without separate backend (`full-app.py`)
 - **API Documentation**: Auto-generated interactive API docs via FastAPI
 - **Environment-based Config**: All settings configurable via environment variables
+
+## DSA Agent - VS Code Extension
+
+### Overview
+
+We've introduced **DSA Agent**, a VS Code extension that transforms the editor into an intelligent learning companion for data structures and algorithms (DSA). Rather than switching between your code and a browser window, DSA Agent brings contextual AI assistance directly into VS Code.
+
+![DSA Agent Extension - Work in Progress](docs/figures/poc-vscode-ext.png)
+
+> 🚧 **Work in Progress**: The extension is in active development. The screenshot above shows current capabilities with more features coming soon.
+
+**Why This Rebrand?**
+
+The original "newbie-app" was generic and unfocused. By rebranding as **DSA Agent**, we've:
+1. **Defined a clear purpose**: Not a generic chatbot, but a specialized agentic assistant for DSA learning
+2. **Aligned with the model server**: Leverages the same AI infrastructure (Qwen3-VL) for consistent responses
+3. **Positioned as an agent**: Emphasizes future autonomous capabilities (code generation, problem solving, test validation)
+4. **Created developer focus**: Targets competitive programmers and interview prep candidates
+5. **Enabled extension development**: Demonstrates how to build intelligent VS Code plugins with REST API backends
+
+### Current Capabilities
+
+- Real-time chat with agentic responses on algorithm and data structure questions
+- Algorithm explanations with complexity analysis (Time/Space)
+- Data structure selection guidance with trade-offs
+- Interview problem-solving strategies
+- Code review and optimization suggestions
+- Server health monitoring and model status display
+
+### Future Roadmap (Upcoming Features)
+
+- **Code Generation Agent**: Generate algorithm implementations from descriptions
+- **Problem-Solving Agent**: Step-by-step solution generation for coding problems
+- **Test Case Generator**: Automatically create and validate test cases
+- **Complexity Visualizer**: Visual analysis of time/space complexity
+- **LeetCode/HackerRank Integration**: Pull problems directly into the extension
+- **Interview Simulator**: Mock interview mode with real-time feedback
+- **Visual Walkthroughs**: Animated algorithm execution traces
+- **Offline Mode**: Local model inference without server dependency
+
+### Advanced Roadmap: Specialized DSA Agents (v2.0+)
+
+The long-term vision includes **domain-specific agentic modules** that work together to provide end-to-end DSA mastery:
+
+#### 1. **Problem Curator Agent** 🎯
+Intelligent problem recommendation engine that:
+- Analyzes your skill level and learning gaps
+- Recommends problems based on weak areas (e.g., "You struggle with graph DFS, try these 3 problems")
+- Tracks problem-solving history and patterns
+- Suggests problems by difficulty progression (easy → medium → hard)
+- Integrates with LeetCode, HackerRank, Codeforces APIs
+- Provides difficulty/acceptance rate metadata
+
+#### 2. **Curriculum Strategist & Designer** 📚
+Personalized learning path generator that:
+- Creates custom learning plans based on interview timeline and target level
+- Structures curriculum by topic clusters (arrays → strings → trees → graphs)
+- Balances breadth (cover all topics) vs. depth (master weak areas)
+- Recommends optimal problem sequence for retention
+- Tracks progress and adjusts curriculum dynamically
+- Generates study schedule (e.g., "3 problems/day for 12 weeks")
+- Recommends supplementary resources (articles, videos) for each topic
+
+#### 3. **E2E Problem, Solve, Test Environment** 🔨
+Complete development environment within the extension:
+- **Problem Context Panel**: Display problem statement, constraints, examples
+- **Integrated Code Editor**: Write solutions with language selection (Python, Java, C++, Go)
+- **Smart Test Runner**: Execute solutions against provided test cases
+- **Custom Test Case Builder**: Create edge cases and stress tests
+- **Performance Profiler**: Measure actual time/space complexity
+- **Visual Debugger**: Step through execution with variable inspection
+- **Solution History**: Track all attempts with diffs
+- **Auto-Submit**: Submit to LeetCode/HackerRank directly from extension
+
+#### 4. **Solution Hinter Agent** 💡
+Progressive hint system that guides without spoiling:
+- **Level 1 (Approach Hint)**: "What data structure would help here?"
+- **Level 2 (Algorithm Hint)**: "Consider using DFS/BFS"
+- **Level 3 (Pattern Hint)**: "This is a two-pointer problem"
+- **Level 4 (Partial Code)**: Show first 20% of solution
+- **Level 5 (Full Solution)**: Reveal complete solution with explanation
+- User controls hint progression (can't skip to full solution)
+- Tracks hint usage to identify problem areas
+
+#### 5. **Solution Optimizer Agent** ⚡
+Multi-dimensional optimization analyzer:
+- **Time Complexity**: Identify bottlenecks and suggest faster approaches
+- **Space Complexity**: Detect unnecessary allocations and optimize memory
+- **Code Quality**: Refactor for readability (variable names, structure)
+- **Best Practices**: Suggest idiomatic patterns for the language
+- **Alternative Solutions**: Show 2-3 different approaches with trade-offs
+- **Comparison Mode**: Side-by-side comparison of your solution vs. optimal
+- **Performance Benchmarking**: Run solutions with large inputs (10^5 - 10^6 scale)
+
+---
+
+### Agent Collaboration Flow (Future Vision)
+
+```
+User Opens Extension
+      ↓
+Problem Curator → Recommends problem based on skill level
+      ↓
+E2E Environment → User codes solution
+      ↓
+Solution Hinter → User stuck? Get progressive hints
+      ↓
+Solution Optimizer → Analyze time/space, suggest improvements
+      ↓
+Curriculum Strategist → Next problems to master, update learning plan
+      ↓
+[Repeat until interview/goals achieved]
+```
+
+This multi-agent architecture ensures:
+- **Personalization**: Every user gets custom learning paths
+- **Guidance without dependency**: Hints teach problem-solving, not just answers
+- **Continuous improvement**: Optimization feedback builds good coding habits
+- **Accountability**: Progress tracking and adaptive difficulty
+- **Real-world readiness**: Full IDE-like environment prepares for actual coding interviews
+
+### Installation & Use
+
+```bash
+# Build the extension
+cd agent/client/extensions/vscode
+npm install
+npm run compile
+
+# Package as .vsix
+npm run package
+
+# Install in VS Code
+# Extensions → Install from VSIX → select dsa-agent-0.1.0.vsix
+```
+
+Then in VS Code Command Palette:
+- `DSA Agent: Start` - Welcome message and status check
+- `DSA Agent: Open Assistant` - Open the chat panel
+
+### Architecture
+
+The extension follows the same disaggregated pattern as the web app:
+- **Frontend**: VS Code WebView (HTML/CSS/JS + TypeScript)
+- **Backend**: Model server (FastAPI on port 8000)
+- **Communication**: REST API via `fetch()`
+
+This allows the extension to reuse the same model server as the Gradio app, enabling seamless multi-client support.
+
+---
 
 ## Setup
 
 ### Prerequisites
 
-- NVIDIA GPU with CUDA support (recommended: 12GB+ VRAM)
+- NVIDIA GPU with CUDA support (recommended: 8GB+ VRAM for int4 quantization, 15GB+ for native)
 - Conda environment with Python 3.12
 - Qwen3-VL-8B-Instruct model downloaded
+- VS Code with extension support
 
-### 1. Install Dependencies
+### 1. Install Backend Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -52,139 +204,105 @@ conda run -n aiops-py312 pip install -r requirements.txt
 Required packages:
 - `transformers` - Hugging Face transformers library
 - `torch` - PyTorch with CUDA support
-- `gradio` - Web UI framework
 - `fastapi` - REST API backend
 - `uvicorn` - ASGI server
 - `bitsandbytes` - 4-bit quantization
 - `accelerate` - Model parallelism
-- `pillow` - Image processing
 - `requests` - HTTP client
 
 ### 2. Verify Qwen Model Path
 
-The app expects the Qwen3-VL model at:
+The backend expects the Qwen3-VL model at:
 ```
 /root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct
 ```
 
-To use a different path, update `MODEL_PATH` in `model_server.py`:
+To use a different path, update `MODEL_PATH` in `agent/serving/model_server.py`:
 
 ```python
 MODEL_PATH = Path("/path/to/your/Qwen3-VL-8B-Instruct")
 ```
 
-## Usage
-
-### Option 1: Start Both Services (Recommended)
-
-Use the provided startup script:
+### 3. Start the Backend Model Server
 
 ```bash
-./start.sh
+cd /root/workspace/lnd/aiops/apps/newbie-app
+conda run -n aiops-py312 python agent/serving/model_server.py
 ```
 
-This will:
-- Clean up any existing processes
-- Start the model server on port 8000
-- Start the Gradio frontend on port 7860
-- Save logs to `logs/` directory
-- Show real-time status updates
+The server will:
+- Load the Qwen3-VL model (takes 30-60 seconds on first run)
+- Start listening on `http://localhost:8000`
+- Display API docs at `http://localhost:8000/docs`
 
-### Option 2: Standalone Gradio App
+You'll see:
+```
+INFO:     Started server process [XXXX]
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+```
 
-Run the all-in-one version without a separate backend:
+### 4. Install DSA Agent VS Code Extension
 
+**Option A: Build from source**
 ```bash
-conda run -n aiops-py312 python full-app.py
+cd agent/client/extensions/vscode
+npm install
+npm run compile
+npm run package
 ```
 
-This version includes the model directly in the Gradio app (simpler but less scalable).
+Then in VS Code: `Extensions → Install from VSIX → select dsa-agent-0.1.0.vsix`
 
-### Option 3: Start Services Manually
-
-**With native loading (default):**
+**Option B: Use pre-built package**
 ```bash
-# Terminal 1 - Start Model Server
-LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 conda run -n aiops-py312 python src/serving/model_server.py
-
-# Terminal 2 - Start Gradio Frontend
-conda run -n aiops-py312 python src/client/web_app.py
+# Copy the .vsix file if available
+cp agent/client/extensions/vscode/dsa-agent-0.1.0.vsix ~/Downloads/
 ```
 
-**With vLLM (high performance):**
-```bash
-# Terminal 1 - Start Model Server with vLLM
-LOADING_STRATEGY=vllm QUANTIZATION_TYPE=none conda run -n aiops-py312 python src/serving/model_server.py
+Then in VS Code: `Extensions → Install from VSIX → ~/Downloads/dsa-agent-0.1.0.vsix`
 
-# Terminal 2 - Start Gradio Frontend
-conda run -n aiops-py312 python src/client/web_app.py
-```
+### 5. Use DSA Agent
 
-### Configuration Examples
+With both the backend running and extension installed:
 
-**Development (lower memory):**
-```bash
-LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 ATTENTION_IMPL=sdpa ./start.sh
-```
-
-**Production (high throughput):**
-```bash
-LOADING_STRATEGY=vllm VLLM_GPU_MEMORY_UTILIZATION=0.95 ./start.sh
-```
-
-**Multi-GPU:**
-```bash
-LOADING_STRATEGY=vllm VLLM_TENSOR_PARALLEL_SIZE=2 ./start.sh
-```
-```bash
-conda run -n aiops-py312 python app.py
-```
-
-### Access the Application
-
-- **Frontend**: http://localhost:7860
-- **API Docs**: http://localhost:8000/docs
-
-### Using the App
-
-1. Open the Gradio interface at http://localhost:7860
-2. The model is automatically loaded on server startup (wait 30-60 seconds on first run)
-3. Once the server is ready, you can start sending messages
-4. Optionally upload an image to go along with your message
-5. View responses with timing information
+1. Open VS Code Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Run `DSA Agent: Open Assistant` to open the chat panel
+3. Ensure the status shows "Model: Loaded | Status: ok"
+4. Start asking questions about data structures, algorithms, or interview prep
+5. Click **Load Model** if needed to initialize the model on the server
 
 ## API Endpoints
 
-The FastAPI backend provides these endpoints:
+The FastAPI backend provides these endpoints (used by the VS Code extension):
 
 - `GET /health` - Check server and model status
 - `POST /load_model` - Load the Qwen3-VL model
-- `POST /chat` - Send a message with optional image
-- `POST /clear_history` - Clear conversation history
-- `GET /history` - Get current conversation history
+- `POST /chat` - Send a message for DSA assistance
 - `GET /docs` - Interactive API documentation
 
 ## File Structure
 
 ```
 newbie-app/
-├── src/
-│   ├── __init__.py
+├── agent/
 │   ├── client/
-│   │   └── web_app.py         # Gradio frontend (REST client)
+│   │   └── extensions/
+│   │       └── vscode/                # DSA Agent VS Code Extension
+│   │           ├── src/
+│   │           │   └── extension.ts   # Extension entry point
+│   │           ├── package.json       # Extension manifest
+│   │           ├── tsconfig.json      # TypeScript config
+│   │           └── README.md          # Extension-specific docs
 │   └── serving/
 │       ├── __init__.py
-│       ├── model_server.py    # FastAPI REST API layer
-│       ├── model_loader.py    # Model loading business logic
-│       └── inference_engine.py # Inference processing logic
-├── full-app.py                 # Standalone Gradio app (no separate backend)
-├── start.sh                    # Startup script for both services
-├── requirements.txt            # Python dependencies
-├── .env.example               # Configuration template
-├── logs/                       # Log files (auto-created)
-│   ├── model_server.log
-│   └── frontend.log
-└── README.md                  # This file
+│       ├── model_server.py            # FastAPI REST API layer
+│       ├── model_loader.py            # Model loading business logic
+│       └── inference_engine.py        # Inference processing logic
+├── requirements.txt                   # Python dependencies
+├── .env.example                       # Configuration template
+├── logs/                              # Log files (auto-created)
+│   └── model_server.log
+└── README.md                          # This file
 ```
 
 ### Architecture
@@ -295,88 +413,125 @@ To use AWQ/GPTQ quantization, you need to either:
 
 ## Troubleshooting
 
-### vLLM Initialization Issues
-
-**Problem: vLLM takes 10+ minutes to initialize or system becomes unresponsive**
-- **Root Cause**: Insufficient system RAM (requires 24-32GB, not just GPU memory)
-- **Symptoms**: 
-  - System thrashing (100% RAM usage)
-  - "Graph optimization" stage takes >10 minutes
-  - `VLLM::EngineCore` process consuming all available memory
-- **Solution**: Use native loading instead
-  ```bash
-  LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 python src/serving/model_server.py
-  ```
-- **If you must use vLLM**: Upgrade system RAM to 32GB minimum
-
-**vLLM Initialization Stages (for debugging):**
-1. Model Discovery: ~5-10s - Scanning model files
-2. Model Loading: ~30-60s - Loading weights to RAM
-3. GPU Transfer: ~45-90s - Moving weights to VRAM
-4. **Model Compilation: 5-8 min** - First run only, CUDA kernel compilation
-5. KV Cache Allocation: ~20-30s - Allocating GPU memory pools
-6. Worker Initialization: ~15-30s - Starting inference workers
-7. Warmup: ~10-20s - Running test batches
-
-*Total first run: ~8-12 min | Subsequent runs: ~3-5 min (kernels cached)*
-
-If stuck at stage 4 for >10 minutes, your system likely lacks sufficient RAM.
-
 ### Model Server Not Starting
 - **Check model path exists**: `ls /root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct`
 - **Check GPU memory**: `nvidia-smi` (requires ~8-10GB VRAM with 4-bit quantization)
 - **Verify dependencies**: `conda run -n aiops-py312 pip list | grep -E "torch|transformers|bitsandbytes"`
 - **Check CUDA**: `python -c "import torch; print(torch.cuda.is_available())"`
 
-### Frontend Cannot Connect to Server
+### Extension Cannot Connect to Server
 - Ensure model server is running on port 8000: `curl http://localhost:8000/health`
-- Check firewall settings: `sudo ufw status`
+- Check if backend returned error message in chat panel
 - Verify localhost access: `netstat -tlnp | grep 8000`
 - Check logs: `tail -f logs/model_server.log`
 
 ### Out of Memory (OOM)
 - **Reduce max tokens**: Lower `MAX_NEW_TOKENS` in config (e.g., 256)
-- **Reduce history**: Lower `MAX_HISTORY` to 3 or fewer
 - **Close other GPU processes**: `nvidia-smi` to check what's using VRAM
 - **Ensure quantization**: Verify 4-bit quantization is enabled
-- **Use smaller batch**: The app processes one request at a time by default
-
-### Port Already in Use
-
-Model Server (8000):
-```bash
-lsof -ti:8000 | xargs kill -9
-```
-
-Frontend (7860):
-```bash
-lsof -ti:7860 | xargs kill -9
-```
-
-Or use the start script which handles cleanup automatically.
-
-### Slow Inference
-- **First run is slow**: Model loading takes 30-60 seconds
-- **Check GPU usage**: `nvidia-smi` should show GPU utilization
-- **Verify GPU inference**: Model should use CUDA, not CPU
-- **Review logs**: Check `logs/model_server.log` for warnings
+- **Use vLLM**: Consider switching to vLLM if native is memory-constrained
 
 ## References
 
 - [Qwen3-VL Model](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct) - Vision-Language model from Qwen
-- [Gradio Documentation](https://www.gradio.app/docs) - Web UI framework
 - [FastAPI Documentation](https://fastapi.tiangolo.com/) - Modern REST API framework
 - [Hugging Face Transformers](https://huggingface.co/docs/transformers) - Model loading and inference
 - [BitsAndBytes](https://github.com/TimDettmers/bitsandbytes) - 4-bit quantization library
-
-## Notes
-
-- The application uses **4-bit quantization** to reduce VRAM requirements from ~32GB to ~8-10GB
-- **GPU acceleration** is automatic via `device_map="auto"` in model loading
-- Model loads on server startup - expect 30-60 second initialization time
-- Logs are stored in `logs/` directory for debugging
-- The `full-app.py` version is simpler but less scalable than the client-server architecture
+- [VS Code Extension API](https://code.visualstudio.com/api) - Building VS Code extensions
 
 ---
 
-**Happy chatting! 🚀**
+## Project Evolution: From "Newbie App" to DSA Agent
+
+### What Changed?
+
+**Phase 1: Generic Foundation** → **Phase 2: Domain-Focused Agent**
+
+| Aspect | Before | After | Reasoning |
+|--------|--------|-------|-----------|
+| **Name** | newbie-app | DSA Agent | Clear domain focus (data structures & algorithms) |
+| **Purpose** | Generic multimodal chat | Specialized learning agent | Targets specific use case (interview prep, competitive programming) |
+| **Positioning** | Chat interface | Agentic assistant | Reflects future autonomous capabilities |
+| **Scope** | Web UI only | Web + Editor | Meets developers where they code |
+| **Vision** | One-shot | Multi-client, extensible | Scalable backend supporting multiple frontends |
+
+### Strategic Thinking Behind the Rebrand
+
+1. **Market Positioning**: "DSA Agent" immediately signals this is NOT a general-purpose chatbot, but a specialized tool for a growing market of:
+   - Software engineers preparing for technical interviews
+   - Competitive programmers
+   - Computer science students learning foundational concepts
+   - Engineering teams building algorithmic solutions
+
+2. **Agentic Architecture**: By calling it an "agent" (not just a chatbot), we're positioning it for future evolution:
+   - Currently: Responsive Q&A
+   - Near term: Autonomous code generation + validation
+   - Vision: Self-correcting problem-solver that can debug its own implementations
+
+3. **Developer Workflow Integration**: Web UIs are great, but developers spend most time in their editor. The VS Code extension brings DSA assistance into the code editor workflow, eliminating context switching.
+
+4. **Reusable Backend**: The disaggregated architecture means:
+   - One model server supports multiple clients (Gradio, VS Code, future CLI, mobile app)
+   - Easy to add new interfaces without retraining models
+   - Consistent backend ensures consistent AI responses across platforms
+
+5. **Clear Roadmap**: The "Upcoming Features" section in the README sets expectations:
+   - Users understand this is v1.0 with a clear evolution path
+   - Differentiates from competitors by transparency about future capabilities
+   - Guides development priorities (code generation, test validation, etc.)
+
+### Technical Advantages of This Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  Qwen3-VL Model Server (FastAPI, port 8000)    │
+│  - Handles all inference                        │
+│  - Stateless & scalable                        │
+│  - API-first design                            │
+└──────────┬──────────────────────────────────────┘
+           │ REST API (/chat, /load_model, /health)
+    ┌──────┴─────────────────────────────────────┐
+    │                                            │
+┌──────────────────┐        ┌──────────────────┐
+│  Gradio Web UI   │        │  VS Code Ext.    │
+│  (port 7860)     │        │  (DSA Agent)     │
+└──────────────────┘        └──────────────────┘
+    (Browser-based)           (Editor-integrated)
+
+Benefits:
+✓ One backend serves multiple UIs
+✓ Consistent AI responses everywhere
+✓ Easy to add new clients (CLI, mobile, etc.)
+✓ Model updates propagate to all interfaces
+✓ Reduced duplication
+```
+
+### Why Agent > Assistant > Chatbot
+
+- **Chatbot**: Reactive, rule-based responses. Outdated positioning.
+- **Assistant**: Better, but implies passive help (like Copilot).
+- **Agent**: Proactive, goal-oriented, can take autonomous actions. Implies future code-generation and self-correction capabilities.
+
+For DSA, an "agent" that can:
+1. Understand problem constraints
+2. Generate solution code
+3. Create test cases
+4. Validate correctness
+5. Suggest optimizations
+
+...is significantly more valuable than a chatbot.
+
+---
+
+## Notes
+
+- The backend uses **4-bit quantization** to reduce VRAM requirements from ~32GB to ~8-10GB
+- **GPU acceleration** is automatic via `device_map="auto"` in model loading
+- Model loads on server startup - expect 30-60 second initialization time on first run
+- Logs are stored in `logs/` directory for debugging
+- DSA Agent is designed for educational use and technical interview preparation
+- The disaggregated architecture allows easy addition of new client interfaces (CLI, mobile, etc.)
+
+---
+
+**Happy learning! Master DSA with AI-powered guidance. 🚀**
