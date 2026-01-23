@@ -235,16 +235,92 @@ MAX_NEW_TOKENS=512         # Max tokens per response
 
 Generation parameters (temperature=0.7, top_p=0.9) are configured in `model_server.py`.
 
+### Physical Resource Requirements
+
+**⚠️ CRITICAL: vLLM has significantly higher RAM requirements than native loading**
+
+| Loading Strategy | GPU (VRAM) | System RAM | Storage | Best For |
+|-----------------|------------|------------|---------|----------|
+| **Native + int4** | 5-6GB | 8-10GB | 20GB | Limited RAM systems (≤16GB) |
+| **Native + int8** | 8-10GB | 10-12GB | 20GB | Balanced quality/memory |
+| **Native + none** | 14-16GB | 12-14GB | 20GB | High quality, moderate speed |
+| **vLLM + none** | 15-19GB | **24-32GB** | 30GB | High throughput servers |
+| **vLLM + quantized** | 10-14GB | **24-32GB** | 30GB | Production with pre-quantized models |
+
+**vLLM Resource Breakdown:**
+```
+Component              System RAM    GPU VRAM
+─────────────────────────────────────────────
+Model weights          10-12GB       10-12GB (FP16)
+Python process         2-3GB         -
+Ray worker overhead    3-5GB         -
+vLLM engine core       4-6GB         2-3GB
+KV cache allocation    -             3-4GB
+─────────────────────────────────────────────
+TOTAL                  19-26GB       15-19GB
+```
+
+**💡 Recommendations:**
+- **16GB RAM or less**: Use `LOADING_STRATEGY=native` with `QUANTIZATION_TYPE=int4`
+- **24GB RAM**: vLLM usable but may experience slowdowns
+- **32GB+ RAM**: vLLM recommended for best performance
+- **GPU Memory**: RTX 5060 Ti 16GB / RTX 3090 24GB / RTX 4090 24GB maybe sufficient for both strategies
+
 ### Quantization Options
 
-| Type | Strategy | VRAM | Quality | Speed |
-|------|----------|------|---------|-------|
-| `none` | Both | ~16GB | Best | Baseline |
-| `int4` | Native | ~8GB | Good | Fast |
-| `int8` | Native | ~10GB | Very Good | Medium |
-| `awq/gptq` | vLLM | ~8GB | Good | Very Fast |
+| Type | Strategy | VRAM | Quality | Speed | Notes |
+|------|----------|------|---------|-------|-------|
+| `none` | Both | ~16GB | Best | Baseline | Full precision (FP16/BF16) |
+| `int4` | Native | ~5-6GB | Good | Fast | BitsAndBytes 4-bit ✓ Recommended for low RAM |
+| `int8` | Native | ~8-10GB | Very Good | Medium | BitsAndBytes 8-bit |
+| `awq` | vLLM | ~8GB | Good | Very Fast | Requires pre-quantized model |
+| `gptq` | vLLM | ~8GB | Good | Very Fast | Requires pre-quantized model |
+| `fp8` | vLLM | ~10GB | Excellent | Very Fast | H100+ GPUs only |
+| `squeezellm` | vLLM | ~8GB | Good | Very Fast | Requires pre-quantized model |
+
+**⚠️ Important Notes on vLLM Quantization:**
+
+- **AWQ, GPTQ, SqueezeLLM** require models that have been **pre-quantized** with that specific method
+- You **cannot** use these with a standard model checkpoint
+- If you get an error like "Cannot find the config file for awq", your model is not quantized
+- **FP8** works with any model but requires H100 or newer GPUs
+- **For standard models with vLLM, use `QUANTIZATION_TYPE=none`**
+
+**Using Pre-quantized Models:**
+
+To use AWQ/GPTQ quantization, you need to either:
+1. Download a pre-quantized model from HuggingFace (search for "[model-name]-AWQ" or "[model-name]-GPTQ")
+2. Quantize your model using AutoAWQ or AutoGPTQ libraries
+3. Update `MODEL_PATH` to point to the quantized checkpoint
 
 ## Troubleshooting
+
+### vLLM Initialization Issues
+
+**Problem: vLLM takes 10+ minutes to initialize or system becomes unresponsive**
+- **Root Cause**: Insufficient system RAM (requires 24-32GB, not just GPU memory)
+- **Symptoms**: 
+  - System thrashing (100% RAM usage)
+  - "Graph optimization" stage takes >10 minutes
+  - `VLLM::EngineCore` process consuming all available memory
+- **Solution**: Use native loading instead
+  ```bash
+  LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 python src/serving/model_server.py
+  ```
+- **If you must use vLLM**: Upgrade system RAM to 32GB minimum
+
+**vLLM Initialization Stages (for debugging):**
+1. Model Discovery: ~5-10s - Scanning model files
+2. Model Loading: ~30-60s - Loading weights to RAM
+3. GPU Transfer: ~45-90s - Moving weights to VRAM
+4. **Model Compilation: 5-8 min** - First run only, CUDA kernel compilation
+5. KV Cache Allocation: ~20-30s - Allocating GPU memory pools
+6. Worker Initialization: ~15-30s - Starting inference workers
+7. Warmup: ~10-20s - Running test batches
+
+*Total first run: ~8-12 min | Subsequent runs: ~3-5 min (kernels cached)*
+
+If stuck at stage 4 for >10 minutes, your system likely lacks sufficient RAM.
 
 ### Model Server Not Starting
 - **Check model path exists**: `ls /root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct`

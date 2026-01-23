@@ -24,7 +24,7 @@ from inference_engine import InferenceEngine
 LOADING_STRATEGY = LoadingStrategy(os.getenv("LOADING_STRATEGY", "native"))
 QUANTIZATION_TYPE = QuantizationType(os.getenv("QUANTIZATION_TYPE", "int4"))
 ATTENTION_IMPL = AttentionImplementation(os.getenv("ATTENTION_IMPL", "sdpa"))
-VLLM_GPU_MEMORY_UTILIZATION = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9"))
+VLLM_GPU_MEMORY_UTILIZATION = float(os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.75"))
 VLLM_TENSOR_PARALLEL_SIZE = int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
 
 # Model configuration
