@@ -19,13 +19,16 @@ The frontend communicates with the backend via REST API, enabling scalability an
 
 - **Multimodal Chat Interface**: Text and image processing in one unified interface
 - **Disaggregated Architecture**: Separate frontend (Gradio) and backend (FastAPI) services
-- **GPU-Accelerated Inference**: Automatic GPU detection with `device_map="auto"`
-- **4-bit Quantization**: Memory-efficient model loading using BitsAndBytes
+- **Flexible Loading Strategies**: Choose between native transformers or high-performance vLLM
+- **Multiple Quantization Options**: int4, int8 (native) or AWQ/GPTQ (vLLM)
+- **GPU-Accelerated Inference**: Automatic GPU detection and optimization
+- **Configurable Attention**: SDPA, Eager, or Flash Attention 2 support (native mode)
 - **Conversation History**: Maintains context of last 5 messages
 - **Response Timing**: Real-time performance metrics
 - **Health Monitoring**: Built-in health checks for model server
 - **Standalone Mode**: Option to run Gradio without separate backend (`full-app.py`)
 - **API Documentation**: Auto-generated interactive API docs via FastAPI
+- **Environment-based Config**: All settings configurable via environment variables
 
 ## Setup
 
@@ -99,12 +102,40 @@ This version includes the model directly in the Gradio app (simpler but less sca
 
 ### Option 3: Start Services Manually
 
-**Terminal 1 - Start Model Server:**
+**With native loading (default):**
 ```bash
-conda run -n aiops-py312 python model_server.py
+# Terminal 1 - Start Model Server
+LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 conda run -n aiops-py312 python src/serving/model_server.py
+
+# Terminal 2 - Start Gradio Frontend
+conda run -n aiops-py312 python src/client/web_app.py
 ```
 
-**Terminal 2 - Start Gradio Frontend:**
+**With vLLM (high performance):**
+```bash
+# Terminal 1 - Start Model Server with vLLM
+LOADING_STRATEGY=vllm QUANTIZATION_TYPE=none conda run -n aiops-py312 python src/serving/model_server.py
+
+# Terminal 2 - Start Gradio Frontend
+conda run -n aiops-py312 python src/client/web_app.py
+```
+
+### Configuration Examples
+
+**Development (lower memory):**
+```bash
+LOADING_STRATEGY=native QUANTIZATION_TYPE=int4 ATTENTION_IMPL=sdpa ./start.sh
+```
+
+**Production (high throughput):**
+```bash
+LOADING_STRATEGY=vllm VLLM_GPU_MEMORY_UTILIZATION=0.95 ./start.sh
+```
+
+**Multi-GPU:**
+```bash
+LOADING_STRATEGY=vllm VLLM_TENSOR_PARALLEL_SIZE=2 ./start.sh
+```
 ```bash
 conda run -n aiops-py312 python app.py
 ```
@@ -137,27 +168,81 @@ The FastAPI backend provides these endpoints:
 
 ```
 newbie-app/
-├── app.py                # Gradio frontend (REST client)
-├── full-app.py           # Standalone Gradio app (no separate backend)
-├── model_server.py       # FastAPI backend (model inference)
-├── start.sh             # Startup script for both services
-├── requirements.txt     # Python dependencies
-├── logs/                # Log files (auto-created)
+├── src/
+│   ├── __init__.py
+│   ├── client/
+│   │   └── web_app.py         # Gradio frontend (REST client)
+│   └── serving/
+│       ├── __init__.py
+│       ├── model_server.py    # FastAPI REST API layer
+│       ├── model_loader.py    # Model loading business logic
+│       └── inference_engine.py # Inference processing logic
+├── full-app.py                 # Standalone Gradio app (no separate backend)
+├── start.sh                    # Startup script for both services
+├── requirements.txt            # Python dependencies
+├── .env.example               # Configuration template
+├── logs/                       # Log files (auto-created)
 │   ├── model_server.log
 │   └── frontend.log
-└── README.md           # This file
+└── README.md                  # This file
 ```
+
+### Architecture
+
+The backend follows **clean architecture principles**:
+
+- **`model_server.py`**: Pure REST API layer with FastAPI endpoints
+- **`model_loader.py`**: Business logic for loading models (native/vLLM)
+- **`inference_engine.py`**: Business logic for processing inference requests
+
+This separation ensures:
+- Easy testing of business logic independent of API layer
+- Clear separation of concerns
+- Better maintainability and extensibility
 
 ## Configuration
 
-Key parameters in `model_server.py`:
+The model server supports **flexible loading strategies** via environment variables. Copy `.env.example` to `.env` and customize:
 
-```python
-MAX_HISTORY = 5              # Conversation history to keep
-MAX_NEW_TOKENS = 512         # Max tokens per response
-temperature = 0.7            # Response randomness
-top_p = 0.9                  # Nucleus sampling
+```bash
+cp .env.example .env
 ```
+
+### Loading Strategies
+
+**Option 1: Native Loading (transformers)**
+```bash
+LOADING_STRATEGY=native
+QUANTIZATION_TYPE=int4        # none, int4, int8
+ATTENTION_IMPL=sdpa          # eager, sdpa, flash_attention_2
+```
+
+**Option 2: vLLM Loading (High Performance)**
+```bash
+LOADING_STRATEGY=vllm
+QUANTIZATION_TYPE=none        # none, awq, gptq (requires pre-quantized model)
+VLLM_GPU_MEMORY_UTILIZATION=0.9
+VLLM_TENSOR_PARALLEL_SIZE=1
+```
+
+### Key Parameters
+
+```bash
+MODEL_PATH=/root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct
+MAX_HISTORY=5              # Conversation history to keep
+MAX_NEW_TOKENS=512         # Max tokens per response
+```
+
+Generation parameters (temperature=0.7, top_p=0.9) are configured in `model_server.py`.
+
+### Quantization Options
+
+| Type | Strategy | VRAM | Quality | Speed |
+|------|----------|------|---------|-------|
+| `none` | Both | ~16GB | Best | Baseline |
+| `int4` | Native | ~8GB | Good | Fast |
+| `int8` | Native | ~10GB | Very Good | Medium |
+| `awq/gptq` | vLLM | ~8GB | Good | Very Fast |
 
 ## Troubleshooting
 
