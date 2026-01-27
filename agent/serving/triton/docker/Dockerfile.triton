@@ -1,0 +1,65 @@
+# Build argument must be declared before use
+ARG BUILD_MODE=dev
+
+# ============================================
+# Stage 1: Development - with site-packages
+# ============================================
+FROM nvcr.io/nvidia/tritonserver:25.12-py3 AS dev-stage
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    git \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade setuptools wheel
+
+# Copy site-packages from host (must be provided during build)
+# Usage: docker build --build-arg BUILD_MODE=dev --build-context site-packages=/root/miniconda3/envs/aiops-py312/lib/python3.12/site-packages .
+COPY --from=site-packages . /usr/local/lib/python3.12/dist-packages/
+
+# ============================================
+# Stage 2: Production - install via pip
+# ============================================
+FROM nvcr.io/nvidia/tritonserver:25.12-py3 AS prod-stage
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    git \
+    curl \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --upgrade pip setuptools wheel
+
+# Install PyTorch and transformers
+RUN pip install torch==2.0.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+RUN pip install transformers>=4.57.0 accelerate>=1.12.0 bitsandbytes>=0.49.0 safetensors>=0.7.0
+
+# Install vLLM (optional, for high-performance inference)
+RUN pip install vllm>=0.6.0
+
+# Install additional ML packages
+RUN pip install \
+    pillow>=12.0.0 \
+    requests>=2.32.0 \
+    pydantic>=2.12.0 \
+    numpy>=2.4.0
+
+# ============================================
+# Final Stage: Select based on BUILD_MODE
+# ============================================
+FROM ${BUILD_MODE}-stage AS final
+
+# Create model directory
+RUN mkdir -p /models
+
+# Set working directory
+WORKDIR /models
+
+# Expose ports
+EXPOSE 8000 8001 8002
+
+# Default command to start Triton server
+CMD ["tritonserver", "--model-repository=/models"]
