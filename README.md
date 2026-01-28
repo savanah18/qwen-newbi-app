@@ -10,25 +10,30 @@ Built with [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), a power
 
 ## Architecture
 
-The platform uses a **disaggregated architecture** with backend model server and multiple client frontends:
+The platform uses a **disaggregated architecture** with multiple backend serving options and client frontends:
 
-- **Backend** (`agent/serving/model_server.py`): FastAPI model server running on port 8000, handles all AI inference
+- **Backend Options**:
+  - **FastAPI Server** (`agent/serving/fastapi`): Legacy server on port 8000
+  - **Triton Inference Server** (`agent/serving/triton`): Production-grade GPU inference on ports 8000-8002 (HTTP/gRPC/Metrics)
 - **VS Code Extension** (`agent/client/extensions/vscode`): DSA Agent extension providing editor-integrated learning
+- **Docker Compose**: Orchestrates all services with GPU support, health checks, and volume mounts
 
-The extension communicates with the backend via REST API, enabling scalability and potential for additional clients (CLI, mobile, etc.).
+The extension communicates with backends via REST API, enabling scalability and multi-client support (CLI, web, mobile).
 
 ## Features
 
 - **VS Code Extension (DSA Agent)**: Agentic assistant integrated directly into your editor
 - **Agentic Chat**: AI-powered responses on algorithm and data structure concepts
 - **Multi-Domain Support**: Covers algorithm design, data structures, complexity analysis, interview prep
-- **Server Health Monitoring**: Built-in health checks and model status display
-- **Flexible Loading Strategies**: Choose between native transformers or high-performance vLLM
-- **Multiple Quantization Options**: int4, int8 (native) or AWQ/GPTQ (vLLM) for memory efficiency
-- **GPU-Accelerated Inference**: Automatic GPU detection and optimization
+- **Production-Grade Serving**: NVIDIA Triton Inference Server with Python backend
+- **Multi-Stage Docker Builds**: Dev mode (fast iteration with host site-packages) or Prod mode (clean pip installs)
+- **Health Monitoring**: Built-in health checks via Triton `/v2/health/ready` endpoint
+- **Flexible Loading Strategies**: Native transformers, vLLM, TensorRT-LLM, or ONNX Runtime
+- **Multiple Quantization Options**: int4, int8 via BitsAndBytes for memory efficiency
+- **GPU-Accelerated Inference**: NVIDIA Container Toolkit with automatic GPU passthrough
 - **Configurable Attention Mechanisms**: SDPA, Eager, or Flash Attention 2 support
 - **Response Timing**: Real-time performance metrics
-- **API Documentation**: Auto-generated interactive API docs via FastAPI
+- **API Documentation**: Auto-generated interactive API docs via FastAPI/Triton
 - **Environment-based Config**: All settings configurable via environment variables
 
 ## DSA Agent - VS Code Extension

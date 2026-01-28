@@ -1,0 +1,104 @@
+version: '3.9'
+
+services:
+  # FastAPI Model Server (optional - keep for backward compatibility)
+  fastapi-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dsa-agent-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      - LOADING_STRATEGY=native
+      - QUANTIZATION_TYPE=int4
+      - ATTENTION_IMPL=sdpa
+      - MODEL_PATH=/root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct
+      - MAX_HISTORY=5
+      - MAX_NEW_TOKENS=512
+      - TEMPERATURE=0.7
+      - TOP_P=0.9
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - /root/workspace/lnd/aiops/vlm:/root/workspace/lnd/aiops/vlm:ro
+      - ./agent/serving:/app/agent/serving:ro
+    working_dir: /app/agent/serving
+    command: python model_server.py
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - dsa-network
+
+  # Triton Inference Server
+  triton-server:
+    build:
+      context: ./agent/serving/triton/docker
+      dockerfile: Dockerfile.triton
+      args:
+        BUILD_MODE: ${BUILD_MODE:-dev}  # 'dev' or 'prod'
+      additional_contexts:
+        site-packages: /root/miniconda3/envs/aiops-py312/lib/python3.12/site-packages
+    container_name: dsa-agent-triton
+    ports:
+      - "8000:8000"   # HTTP
+      - "8001:8001"   # gRPC
+      - "8002:8002"   # Metrics
+    environment:
+      - MODEL_PATH=/root/workspace/lnd/aiops/vlm/Qwen/Qwen3-VL-8B-Instruct
+      - QUANTIZATION_TYPE=int4
+      - ATTENTION_IMPL=sdpa
+      - MAX_HISTORY=5
+      - MAX_NEW_TOKENS=512
+      - TEMPERATURE=0.7
+      - TOP_P=0.9
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ./agent/serving/triton/models:/models:ro
+      - /root/workspace/lnd/aiops/vlm:/root/workspace/lnd/aiops/vlm:ro
+      - /root/miniconda3/envs/aiops-py312/lib/python3.12/site-packages:/tmp/site-packages/:ro
+    command: tritonserver --model-repository=/models --log-verbose=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - fastapi-server
+    networks:
+      - dsa-network
+
+  # Nginx Reverse Proxy (optional - for routing)
+  nginx:
+    image: nginx:latest
+    container_name: dsa-agent-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./agent/serving/triton/docker/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - fastapi-server
+      - triton-server
+    networks:
+      - dsa-network
+
+networks:
+  dsa-network:
+    driver: bridge
