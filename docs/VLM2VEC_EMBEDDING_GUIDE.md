@@ -70,14 +70,16 @@ embedding = embedding / np.linalg.norm(embedding)
 
 ```python
 from agent.memory.embeddings import VLM2VecEmbeddings
-from agent.serving.fastapi.src.model_loader import ModelLoader
+from transformers import AutoModelForCausalLM, AutoProcessor
 
 # Load your existing model
-model, processor = ModelLoader.load_native(
-    model_path="Qwen/Qwen3-VL-8B-Instruct",
-    quantization_type="int4",
-    attention_impl="sdpa"
+model = AutoModelForCausalLM.from_pretrained(
+    "Qwen/Qwen3-VL-8B-Instruct",
+    torch_dtype="auto",
+    device_map="auto",
+    load_in_4bit=True
 )
+processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-8B-Instruct")
 
 # Create embedding service
 embedder = VLM2VecEmbeddings(

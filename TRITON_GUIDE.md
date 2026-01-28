@@ -2,61 +2,59 @@
 
 ## Overview
 
-This project now includes **Triton Inference Server** integration for high-performance model serving alongside the original FastAPI server. Both services can run simultaneously, providing flexibility and scalability.
+This project uses **Triton Inference Server** for high-performance, GPU-accelerated model serving with dynamic batching support.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                   Clients                        │
-│  (VS Code Extension, Web UI, REST Clients)      │
-└──────────────────────┬──────────────────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │                         │
-    ┌─────▼─────┐           ┌─────▼─────┐
-    │ FastAPI   │           │   Triton  │
-    │ (Port     │           │   (Port   │
-    │  8000)    │           │   8001)   │
-    └─────┬─────┘           └─────┬─────┘
-          │                       │
-          └───────────┬───────────┘
-                      │
-            ┌─────────▼──────────┐
-            │  Qwen3-VL Model    │
-            │  (GPU Accelerated)  │
-            └────────────────────┘
+┌──────────────────────────────────────┐
+│       Client Applications             │
+│  (VS Code, Web, REST, gRPC)          │
+└──────────────────┬────────────────────┘
+                   │
+        ┌──────────▼──────────┐
+        │  Triton Server      │
+        │  (8000/8001/8002)   │
+        └──────────┬──────────┘
+                   │
+        ┌──────────▼──────────┐
+        │  Qwen3-VL Model     │
+        │  (GPU-accelerated)   │
+        └─────────────────────┘
 ```
 
 ## Directory Structure
 
 ```
 newbie-app/
-├── docker-compose.yml               # Orchestration (FastAPI + Triton)
-├── Dockerfile                       # FastAPI image
-├── requirements.txt
+├── docker-compose.yml               # Service orchestration
+├── requirements.txt                 # Dependencies
 │
 ├── agent/
-│   ├── serving/                     # Original FastAPI server + Triton
-│   │   ├── model_server.py
-│   │   ├── inference_engine.py
-│   │   ├── model_loader.py
-│   │   ├── triton-models/           # NEW: Triton model repository
-│   │   │   └── qwen3-vl/
-│   │   │       ├── config.pbtxt
-│   │   │       └── 1/
-│   │   │           └── model.py
-│   │   │
-│   │   └── triton-docker/           # NEW: Triton Docker files
-│   │       ├── Dockerfile.triton
-│   │       ├── nginx.conf
-│   │       ├── requirements-triton.txt
-│   │       └── start-services.sh
+│   ├── memory/                      # RAG system
+│   │   ├── config.py
+│   │   ├── vector_store.py
+│   │   ├── chunking.py
+│   │   └── retriever.py
+│   │
+│   ├── serving/
+│   │   └── triton/
+│   │       ├── models/
+│   │       │   └── qwen3-vl/
+│   │       │       ├── config.pbtxt
+│   │       │       └── 1/
+│   │       │           └── model.py
+│   │       │
+│   │       └── docker/
+│   │           ├── Dockerfile.triton
+│   │           ├── nginx.conf
+│   │           └── requirements-triton.txt
+│   │
 │   └── client/
-│       ├── triton_client.py         # NEW: Triton client library
-│       └── web/
+│       ├── triton_client.py
+│       └── extensions/vscode/
 │
-├── docs/
+└── docs/
 ```
 
 ## Quick Start
@@ -66,86 +64,49 @@ newbie-app/
 ```bash
 cd /root/workspace/lnd/aiops/apps/newbie-app
 
-# Make startup script executable
-chmod +x triton-docker/start-services.sh
-
-# Build and start
-./triton-docker/start-services.sh
-```
-
-Or manually with docker-compose:
-```bash
-docker-compose build
-docker-compose up -d
+# Build and start Triton
+docker-compose up --build
 ```
 
 ### 2. Verify Services
 
-Check FastAPI health:
-```bash
-curl http://localhost:8000/health
-```
-
 Check Triton health:
 ```bash
-curl http://localhost:8001/v2/health/live
+curl http://localhost:8000/v2/health/ready
+```
+
+Check Triton model status:
+```bash
+curl http://localhost:8000/v2/models/qwen3-vl
 ```
 
 ### 3. Send Inference Request
 
-**Via FastAPI (REST):**
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "What is a binary tree?",
-    "image_base64": null
-  }'
-```
-
-**Via Triton (HTTP):**
+**Using Python Client:**
 ```bash
 python agent/client/triton_client.py
 ```
 
-## Usage Guide
-
-### FastAPI Server (Original)
-
-Still available at `http://localhost:8000`
-
-**Endpoints:**
-- `GET /health` - Server health check
-- `POST /chat` - Send chat message with optional image
-- `POST /load_model` - Load model with custom settings
-- `POST /clear_history` - Clear conversation history
-- `GET /history` - Get conversation history
-
-**Example:**
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:8000/chat",
-    json={
-        "message": "What are algorithms?",
-        "image_base64": None
-    }
-)
-print(response.json())
+**Using cURL:**
+```bash
+# Check health
+curl http://localhost:8000/v2/health/live
 ```
 
-### Triton Server (New)
+## Usage Guide
+
+### Triton Server
 
 Available at:
-- **HTTP:** `http://localhost:8001`
-- **gRPC:** `localhost:8002`
+- **HTTP:** `http://localhost:8000`
+- **gRPC:** `localhost:8001`
+- **Metrics:** `http://localhost:8002`
 
 **Using Python Client:**
 ```python
 from agent.client.triton_client import TritonHttpClient
 
-client = TritonHttpClient("localhost:8001")
+client = TritonHttpClient("localhost:8000")
 
 if client.check_health():
     response, response_time = client.chat("What is a data structure?")
@@ -156,17 +117,17 @@ if client.check_health():
 **Using cURL:**
 ```bash
 # Get model metadata
-curl http://localhost:8001/v2/models/qwen3-vl
+curl http://localhost:8000/v2/models/qwen3-vl
 
 # Check health
-curl http://localhost:8001/v2/health/live
+curl http://localhost:8000/v2/health/live
 ```
 
 ## Configuration
 
 ### Environment Variables
 
-Both FastAPI and Triton use the same environment variables (set in `docker-compose.yml`):
+Configure in `docker-compose.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -190,14 +151,20 @@ environment:
 Then restart:
 ```bash
 docker-compose down
-docker-compose up -d
+docker-compose up --build
 ```
 
 ## Performance Comparison
 
-| Feature | FastAPI | Triton |
-|---------|---------|--------|
-| Latency | ~2-5s | ~2-5s |
+| Feature | Value |
+|---------|-------|
+| **Latency** | ~2-5s per request |
+| **Throughput** | Dynamic batching (up to 4x) |
+| **Dynamic Batching** | ✅ Enabled |
+| **gRPC Support** | ✅ Available |
+| **Model Management** | Automatic |
+| **Metrics** | Prometheus-compatible |
+| **Production Ready** | ✅ Yes |
 | Throughput | Lower | Higher (batching) |
 | Dynamic batching | ❌ | ✅ |
 | Model state mgmt | Per-request | Per-instance |
@@ -206,13 +173,13 @@ docker-compose up -d
 
 ## Advanced Usage
 
-### Batch Inference with Triton
+## Batch Inference with Triton
 
 ```python
 from agent.client.triton_client import TritonHttpClient
 import concurrent.futures
 
-client = TritonHttpClient("localhost:8001")
+client = TritonHttpClient("localhost:8000")
 
 messages = [
     "What is a tree?",
@@ -229,24 +196,21 @@ for msg, (response, time) in zip(messages, results):
     print(f"A: {response}\n")
 ```
 
-### Using gRPC for Lower Latency
+## Using gRPC for Lower Latency
 
 ```python
 from agent.client.triton_client import TritonGrpcClient
 
-client = TritonGrpcClient("localhost:8002")  # gRPC port
+client = TritonGrpcClient("localhost:8001")  # gRPC port
 response, response_time = client.chat("Explain quicksort")
 print(f"Response (gRPC): {response_time:.3f}s")
 ```
 
-### Monitor Triton Metrics
+## Monitor Triton Metrics
 
 ```bash
 # Prometheus metrics endpoint
-curl http://localhost:8003/metrics
-
-# Watch model load status
-watch -n 1 'curl -s http://localhost:8001/v2/models/qwen3-vl | jq .'
+curl http://localhost:8002/metrics
 ```
 
 ## Troubleshooting
@@ -259,7 +223,6 @@ docker-compose logs -f
 
 # Check specific service
 docker-compose logs triton-server
-docker-compose logs fastapi-server
 ```
 
 ### Out of Memory (OOM)
@@ -287,22 +250,14 @@ deploy:
 
 ### Slow inference
 
-- **FastAPI**: Use vLLM backend
-  ```bash
-  LOADING_STRATEGY=vllm docker-compose up -d fastapi-server
-  ```
-
-- **Triton**: Enable dynamic batching (already configured in `config.pbtxt`)
+Enable dynamic batching (already configured in `config.pbtxt`). For more details, see [TRITON_PERFORMANCE.md](TRITON_PERFORMANCE.md).
 
 ## API Documentation
 
-### FastAPI (REST)
-- Interactive docs: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
 ### Triton
-- Model metadata: `http://localhost:8001/v2/models/qwen3-vl`
-- Server status: `http://localhost:8001/v2`
+- Model metadata: `http://localhost:8000/v2/models/qwen3-vl`
+- Server status: `http://localhost:8000/v2`
+- Metrics: `http://localhost:8002`
 
 ## Stopping Services
 
@@ -322,11 +277,11 @@ docker-compose stop triton-server
 
 ## Next Steps
 
-1. **Implement vLLM Backend for Triton** (optional, for higher throughput)
-2. **Add ONNX Runtime backend** for faster inference on CPU
-3. **Deploy to Kubernetes** using Helm charts
-4. **Add monitoring** with Prometheus + Grafana
-5. **Implement model versioning** in Triton
+1. **Test with VS Code Extension** - See [agent/client/extensions/vscode/README.md](agent/client/extensions/vscode/README.md)
+2. **Implement RAG features** - See [agent/memory/](agent/memory/) for RAG system
+3. **Monitor Performance** - Check metrics at `http://localhost:8002`
+4. **Scale to Production** - Deploy to Kubernetes with Helm
+5. **Add Monitoring** - Integrate Prometheus + Grafana for metrics
 
 ## References
 
@@ -334,3 +289,4 @@ docker-compose stop triton-server
 - [Python Backend Guide](https://github.com/triton-inference-server/python_backend)
 - [Model Config Reference](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/model_configuration.html)
 - [Triton Client Libraries](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/client.html)
+- [Performance Optimization](TRITON_PERFORMANCE.md)
