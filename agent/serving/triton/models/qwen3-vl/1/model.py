@@ -105,28 +105,41 @@ class TritonPythonModel:
                 message = pb_utils.get_input_tensor_by_name(request, "message")
                 image_input = pb_utils.get_input_tensor_by_name(request, "image")
                 
-                # Convert to Python strings
-                message_str = message.as_numpy()[0].decode('utf-8') if message else ""
+                # Convert to Python strings - handle 2D batched arrays
+                message_str = ""
+                if message is not None:
+                    msg_array = message.as_numpy()
+                    # msg_array is [batch=1, sequence=1] with dtype=object
+                    # Use .flat[0] to get the actual bytes regardless of shape
+                    message_bytes = msg_array.flat[0]
+                    message_str = message_bytes.decode('utf-8') if isinstance(message_bytes, bytes) else message_bytes
+                
                 image_base64 = None
                 if image_input is not None:
-                    image_data = image_input.as_numpy()
-                    if image_data.size > 0:
-                        image_base64 = image_data[0].decode('utf-8')
+                    img_array = image_input.as_numpy()
+                    if img_array.size > 0:
+                        # Same approach - use .flat[0] to get actual bytes
+                        image_bytes = img_array.flat[0]
+                        image_base64 = image_bytes.decode('utf-8') if isinstance(image_bytes, bytes) else image_bytes
                 
                 # Process inference
                 start_time = time.time()
+                print(f"[Triton] Starting inference for message: {message_str[:50]}...")
                 response_text = self._inference(message_str, image_base64)
                 response_time = time.time() - start_time
+                print(f"[Triton] Inference completed in {response_time:.2f}s")
                 
                 # Prepare output tensors
+                # response: [batch_size] with TYPE_STRING
                 response_tensor = pb_utils.Tensor(
                     "response",
                     np.array([response_text.encode('utf-8')], dtype=object)
                 )
                 
+                # response_time: [batch_size] with TYPE_FP32, dims=[1] in config means per-batch scalar
                 time_tensor = pb_utils.Tensor(
                     "response_time",
-                    np.array([[response_time]], dtype=np.float32)
+                    np.array([response_time], dtype=np.float32)
                 )
                 
                 # Create response
@@ -149,7 +162,7 @@ class TritonPythonModel:
                         ),
                         pb_utils.Tensor(
                             "response_time",
-                            np.array([[0.0]], dtype=np.float32)
+                            np.array([0.0], dtype=np.float32)
                         )
                     ]
                 )
@@ -159,19 +172,23 @@ class TritonPythonModel:
     
     def _inference(self, message: str, image_base64: Optional[str]) -> str:
         """Perform inference on the message."""
+        inference_start = time.time()
         if not message.strip():
             return "Error: Message cannot be empty"
         
         # Build content
-        content = [{"type": "text", "text": message}]
+        content = [{
+"type": "text", "text": message}]
         
         # Decode image if provided
         image = None
         if image_base64:
             try:
+                decode_start = time.time()
                 image_data = base64.b64decode(image_base64)
                 image = Image.open(io.BytesIO(image_data))
                 content.append({"type": "image", "image": image})
+                print(f"[Triton] Image decode: {time.time() - decode_start:.2f}s")
             except Exception as e:
                 print(f"Warning: Failed to decode image: {str(e)}")
         
@@ -184,9 +201,11 @@ class TritonPythonModel:
         # Slide context window
         if len(self.conversation_history) > self.max_history:
             self.conversation_history = self.conversation_history[-self.max_history:]
+            print(f"[Triton] Trimmed history to {len(self.conversation_history)} messages")
         
         # Prepare inputs
         try:
+            tokenize_start = time.time()
             inputs = self.processor.apply_chat_template(
                 self.conversation_history,
                 tokenize=True,
@@ -194,6 +213,9 @@ class TritonPythonModel:
                 return_dict=True,
                 return_tensors="pt"
             )
+            tokenize_time = time.time() - tokenize_start
+            input_tokens = inputs['input_ids'].shape[1]
+            print(f"[Triton] Tokenization: {tokenize_time:.2f}s | Input tokens: {input_tokens}")
         except Exception as e:
             print(f"Error preparing inputs: {str(e)}")
             return f"Error preparing inputs: {str(e)}"
@@ -202,6 +224,7 @@ class TritonPythonModel:
         
         # Inference
         try:
+            gen_start = time.time()
             with torch.no_grad():
                 generated_ids = self.model.generate(
                     **inputs,
@@ -210,6 +233,9 @@ class TritonPythonModel:
                     temperature=self.temperature,
                     top_p=self.top_p
                 )
+            gen_time = time.time() - gen_start
+            output_tokens = generated_ids.shape[1] - input_tokens
+            print(f"[Triton] Generation: {gen_time:.2f}s | Output tokens: {output_tokens} | Speed: {output_tokens/gen_time:.1f} tok/s")
             
             generated_ids_trimmed = [
                 out_ids[len(in_ids):] 
