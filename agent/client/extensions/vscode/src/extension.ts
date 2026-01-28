@@ -2,10 +2,13 @@ import * as vscode from 'vscode';
 
 type ChatMessage = { id: number; sender: 'user' | 'assistant'; text: string };
 
-const MODEL_SERVER_URL = 'http://localhost:8000';
-const CHAT_ENDPOINT = `${MODEL_SERVER_URL}/chat`;
-const HEALTH_ENDPOINT = `${MODEL_SERVER_URL}/health`;
-const LOAD_MODEL_ENDPOINT = `${MODEL_SERVER_URL}/load_model`;
+// Triton Inference Server configuration
+const TRITON_HTTP_URL = 'http://localhost:8000';
+const TRITON_MODEL_NAME = 'qwen3-vl';
+const TRITON_INFER_ENDPOINT = `${TRITON_HTTP_URL}/v2/models/${TRITON_MODEL_NAME}/infer`;
+const TRITON_HEALTH_ENDPOINT = `${TRITON_HTTP_URL}/v2/health/ready`;
+const TRITON_MODEL_READY_ENDPOINT = `${TRITON_HTTP_URL}/v2/models/${TRITON_MODEL_NAME}/ready`;
+const MAX_MESSAGES_IN_UI = 100; // Limit chat display to prevent memory issues
 
 export function activate(context: vscode.ExtensionContext): void {
   const helloDisposable = vscode.commands.registerCommand('dsaAgent.helloWorld', () => {
@@ -30,12 +33,13 @@ class ChatPanel {
     {
       id: 1,
       sender: 'assistant',
-      text: '🤖 DSA Agent Activated\n\nHey! I\'m your agentic assistant for data structures, algorithms, and competitive programming. Ask me about:\n• Algorithm design and implementation\n• Data structure selection and optimization\n• Time/space complexity analysis\n• Interview problem strategies\n• Code optimization techniques\n\nLet\'s master DSA together!',
+      text: '🤖 DSA Agent Activated (Triton-Powered)\n\nHey! I\'m your agentic assistant for data structures, algorithms, and competitive programming, now powered by Triton Inference Server for optimal performance. Ask me about:\n• Algorithm design and implementation\n• Data structure selection and optimization\n• Time/space complexity analysis\n• Interview problem strategies\n• Code optimization techniques\n\nLet\'s master DSA together!',
     },
   ];
   private nextId = 2;
   private serverStatus = 'Checking...';
   private modelLoaded = false;
+  private isLoading = false;
 
   private constructor(private readonly context: vscode.ExtensionContext) {
     this.panel = vscode.window.createWebviewPanel(
@@ -72,35 +76,31 @@ class ChatPanel {
 
   private async checkServerHealth(): Promise<void> {
     try {
-      const response = await fetch(HEALTH_ENDPOINT);
-      if (response.ok) {
-        const data = (await response.json()) as { model_loaded: boolean; status: string };
-        this.modelLoaded = data.model_loaded;
-        this.serverStatus = `Model: ${data.model_loaded ? 'Loaded' : 'Not loaded'} | Status: ${data.status}`;
+      // Check Triton server health
+      const healthResponse = await fetch(TRITON_HEALTH_ENDPOINT);
+      const modelResponse = await fetch(TRITON_MODEL_READY_ENDPOINT);
+      
+      if (healthResponse.ok && modelResponse.ok) {
+        this.modelLoaded = true;
+        this.serverStatus = `Triton: Ready | Model: ${TRITON_MODEL_NAME} loaded`;
       } else {
-        this.serverStatus = 'Server error';
+        this.serverStatus = 'Triton: Server running, model not ready';
         this.modelLoaded = false;
       }
     } catch {
-      this.serverStatus = 'Server not running (http://localhost:8000)';
+      this.serverStatus = `Triton: Not running (${TRITON_HTTP_URL})`;
       this.modelLoaded = false;
     }
     this.pushState();
   }
 
   private async loadModel(): Promise<void> {
-    try {
-      const response = await fetch(LOAD_MODEL_ENDPOINT, { method: 'POST' });
-      if (response.ok) {
-        const data = (await response.json()) as { message: string };
-        this.addMessage('assistant', data.message);
-        await this.checkServerHealth();
-      } else {
-        const data = (await response.json()) as { detail?: string };
-        this.addMessage('assistant', `Error loading model: ${data.detail || 'Unknown error'}`);
-      }
-    } catch {
-      this.addMessage('assistant', 'Error: Cannot connect to model server');
+    // With Triton, models are loaded at startup - just check status
+    await this.checkServerHealth();
+    if (this.modelLoaded) {
+      this.addMessage('assistant', `✓ Model ${TRITON_MODEL_NAME} is ready on Triton server`);
+    } else {
+      this.addMessage('assistant', 'Error: Model not loaded. Please start Triton server with the model.');
     }
   }
 
@@ -115,30 +115,80 @@ class ChatPanel {
         return;
       }
       this.messages.push(userMsg);
+      this.pushState(); // Show user message immediately
 
       if (!this.modelLoaded) {
-        this.addMessage('assistant', 'Error: Model not loaded on server. Click "Load Model" first.');
+        this.addMessage('assistant', 'Error: Triton server not ready. Please start the server first.');
+        this.pushState();
         return;
       }
 
+      // Add loading message
+      this.isLoading = true;
+      const loadingMsg: ChatMessage = {
+        id: this.nextId++,
+        sender: 'assistant',
+        text: '⏳ Processing...',
+      };
+      this.messages.push(loadingMsg);
+      this.pushState();
+
       try {
         const startTime = Date.now();
-        const response = await fetch(CHAT_ENDPOINT, {
+        console.log('[DSA Agent] Sending request to Triton:', userMsg.text);
+        
+        // Build Triton inference request
+        const tritonRequest = {
+          inputs: [
+            {
+              name: 'message',
+              shape: [1, 1],
+              datatype: 'BYTES',
+              data: [userMsg.text]
+            }
+          ]
+        };
+
+        const response = await fetch(TRITON_INFER_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: userMsg.text, image_base64: null }),
+          body: JSON.stringify(tritonRequest),
         });
 
         if (response.ok) {
-          const data = (await response.json()) as { response: string; response_time: number };
-          const responseText = `${data.response}\n\n⏱️ Response time: ${data.response_time.toFixed(2)}s`;
-          this.addMessage('assistant', responseText);
+          const data = (await response.json()) as { 
+            outputs: Array<{ name: string; data: string[] }> 
+          };
+          
+          console.log('[DSA Agent] Received response from Triton:', data);
+          
+          // Extract response and response_time from outputs
+          const responseOutput = data.outputs.find(o => o.name === 'response');
+          const timeOutput = data.outputs.find(o => o.name === 'response_time');
+          
+          const responseText = responseOutput?.data[0] || 'No response';
+          const responseTime = timeOutput?.data[0] || 0;
+          const totalTime = (Date.now() - startTime) / 1000;
+          
+          console.log('[DSA Agent] Total time:', totalTime, 'Model time:', responseTime);
+          
+          const displayText = `${responseText}\n\n⏱️ Model: ${Number(responseTime).toFixed(2)}s | Total: ${totalTime.toFixed(2)}s`;
+          
+          // Remove loading message and add real response
+          this.messages.pop();
+          this.addMessage('assistant', displayText);
         } else {
-          const data = (await response.json()) as { detail?: string };
-          this.addMessage('assistant', `Server error: ${data.detail || 'Unknown error'}`);
+          const errorText = await response.text();
+          console.error('[DSA Agent] Triton error:', errorText);
+          this.messages.pop();
+          this.addMessage('assistant', `Triton error: ${errorText}`);
         }
-      } catch {
-        this.addMessage('assistant', 'Error: Cannot connect to model server');
+      } catch (error) {
+        console.error('[DSA Agent] Connection error:', error);
+        this.messages.pop();
+        this.addMessage('assistant', `Error: Cannot connect to Triton server - ${error}`);
+      } finally {
+        this.isLoading = false;
       }
       this.pushState();
     } else if (message.action === 'load-model') {
@@ -199,11 +249,11 @@ class ChatPanel {
 <body>
   <header>
     <div>
-      <div class="header-title">🤖 DSA Agent</div>
-      <div class="header-status" id="status-text">Checking server...</div>
+      <div class="header-title">🤖 DSA Agent (Triton)</div>
+      <div class="header-status" id="status-text">Checking Triton server...</div>
     </div>
     <div class="controls">
-      <button onclick="loadModel()" class="secondary" style="flex: 0 1 auto;">Load Model</button>
+      <button onclick="checkHealth()" class="secondary" style="flex: 0 1 auto;">Check Status</button>
     </div>
   </header>
   <main id="messages" aria-live="polite"></main>
@@ -234,14 +284,15 @@ class ChatPanel {
     };
 
     window.addEventListener('message', event => {
-      const { type, messages, serverStatus, modelLoaded } = event.data;
+      const { type, messages, serverStatus, modelLoaded, isLoading } = event.data;
       if (type === 'state') {
         render(messages ?? []);
         if (serverStatus !== undefined) {
           statusEl.textContent = serverStatus;
         }
-        if (modelLoaded !== undefined) {
-          sendBtn.disabled = !modelLoaded;
+        if (modelLoaded !== undefined || isLoading !== undefined) {
+          sendBtn.disabled = !modelLoaded || isLoading;
+          inputEl.disabled = !modelLoaded || isLoading;
         }
       }
     });
@@ -258,6 +309,10 @@ class ChatPanel {
       vscode.postMessage({ action: 'load-model' });
     }
 
+    function checkHealth() {
+      vscode.postMessage({ action: 'check-health' });
+    }
+
     function clearChat() {
       vscode.postMessage({ action: 'clear-chat' });
     }
@@ -267,11 +322,15 @@ class ChatPanel {
   }
 
   private pushState(): void {
+    // Limit messages to prevent memory issues
+    const messagesToSend = this.messages.slice(-MAX_MESSAGES_IN_UI);
+    
     this.panel.webview.postMessage({
       type: 'state',
-      messages: this.messages,
+      messages: messagesToSend,
       serverStatus: this.serverStatus,
       modelLoaded: this.modelLoaded,
+      isLoading: this.isLoading,
     });
   }
 }
