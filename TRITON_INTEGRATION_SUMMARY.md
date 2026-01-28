@@ -2,13 +2,13 @@
 
 ## Summary
 
-Triton Inference Server has been successfully integrated into the DSA Agent project while keeping the original source code intact.
+Triton Inference Server is the primary inference engine for the DSA Agent, providing GPU-accelerated model serving with dynamic batching support.
 
 ### What Was Added
 
-#### 1. **Triton Model Repository** (`agent/serving/triton-models/`)
+#### 1. **Triton Model Repository** (`agent/serving/triton/models/`)
 ```
-agent/serving/triton-models/qwen3-vl/
+agent/serving/triton/models/qwen3-vl/
 ├── config.pbtxt          # Model configuration
 └── 1/
     └── model.py          # Python backend implementation
@@ -19,14 +19,13 @@ agent/serving/triton-models/qwen3-vl/
 - Dynamic batching (4 requests per batch)
 - GPU acceleration
 - Conversation history management
-- Same inference logic as FastAPI
+- High-performance inference with async operations
 
 #### 2. **Docker & Orchestration**
-- `Dockerfile` - FastAPI image (unchanged setup)
-- `agent/serving/triton-docker/Dockerfile.triton` - Triton Inference Server image
-- `docker-compose.yml` - Orchestrate both services
-- `agent/serving/triton-docker/nginx.conf` - Nginx routing proxy
-- `agent/serving/triton-docker/start-services.sh` - One-command startup
+- `agent/serving/triton/docker/Dockerfile.triton` - Multi-stage Triton image (dev/prod modes)
+- `docker-compose.yml` - Service orchestration with GPU support
+- `agent/serving/triton/docker/nginx.conf` - Nginx routing proxy
+- `agent/serving/triton/docker/requirements-triton.txt` - Triton dependencies
 
 #### 3. **Python Triton Client** (`agent/client/triton_client.py`)
 ```python
@@ -43,58 +42,47 @@ response, time = client.chat("What is an algorithm?")
 ### Architecture
 
 ```
-┌──────────────────────────────────────────┐
-│         Client Applications               │
-│  (VS Code, Web UI, REST Clients, gRPC)   │
-└──────────────────────┬───────────────────┘
-                       │
-        ┌──────────────┴──────────────┐
-        │                             │
-   ┌────▼──────┐             ┌───────▼────┐
-   │  FastAPI  │             │   Triton   │
-   │  (8000)   │             │   (8001)   │
-   └────┬──────┘             └───────┬────┘
-        │                            │
-        └─────────────┬──────────────┘
-                      │
-            ┌─────────▼──────────┐
-            │  Qwen3-VL Model    │
-            │  (GPU-accelerated)  │
-            └────────────────────┘
+┌──────────────────────────────────────┐
+│       Client Applications             │
+│  (VS Code, Web, REST, gRPC)          │
+└──────────────────┬────────────────────┘
+                   │
+        ┌──────────▼──────────┐
+        │  Triton Server      │
+        │  (8000/8001/8002)   │
+        └──────────┬──────────┘
+                   │
+        ┌──────────▼──────────┐
+        │  Qwen3-VL Model     │
+        │  (GPU-accelerated)   │
+        └─────────────────────┘
 ```
 
 ### Service Endpoints
 
 | Service | Protocol | Port | URL |
 |---------|----------|------|-----|
-| FastAPI | HTTP/REST | 8000 | `http://localhost:8000` |
-| Triton | HTTP/REST | 8001 | `http://localhost:8001` |
-| Triton | gRPC | 8002 | `localhost:8002` |
-| Triton | Metrics | 8003 | `http://localhost:8003` |
-| Nginx Proxy | HTTP | 80 | `http://localhost` |
+| Triton | HTTP/REST | 8000 | `http://localhost:8000` |
+| Triton | gRPC | 8001 | `localhost:8001` |
+| Triton | Metrics | 8002 | `http://localhost:8002` |
 
 ### Startup
 
 ```bash
 cd /root/workspace/lnd/aiops/apps/newbie-app
 
-# Option 1: Use startup script
-chmod +x triton-docker/start-services.sh
-./triton-docker/start-services.sh
-
-# Option 2: Use docker-compose
-docker-compose build
-docker-compose up -d
+# Build and start Triton
+docker-compose up --build
 ```
 
 ### Verify Services Are Running
 
 ```bash
-# Check FastAPI
-curl http://localhost:8000/health
+# Check Triton health
+curl http://localhost:8000/v2/health/ready
 
-# Check Triton
-curl http://localhost:8001/v2/health/live
+# Check model status
+curl http://localhost:8000/v2/models/qwen3-vl
 
 # Test with Python client
 python agent/client/triton_client.py
@@ -117,74 +105,56 @@ environment:
 
 Modify in `docker-compose.yml` and restart services.
 
-### Original Source Code Status
+### Key Components
 
-✅ **UNCHANGED:**
-- `agent/serving/model_server.py` (FastAPI)
-- `agent/serving/inference_engine.py`
-- `agent/serving/model_loader.py`
-- `agent/client/web/app.py` (Gradio)
-- `requirements.txt`
-- All other original files
+**Triton Model Configuration:**
+- `agent/serving/triton/models/qwen3-vl/config.pbtxt` - Model configuration with dynamic batching
+- `agent/serving/triton/models/qwen3-vl/1/model.py` - Python backend with inference logic
 
-**New additions only:**
-- Triton model configuration
-- Triton Python backend
-- Docker configuration
-- Client library for Triton
-- Documentation
+**Supporting Files:**
+- `agent/client/triton_client.py` - Python client library
+- `docker-compose.yml` - Service orchestration
+- `requirements.txt` - Dependencies (including tritonclient, gevent, geventhttpclient)
 
-### Comparison: FastAPI vs Triton
-
-| Feature | FastAPI | Triton |
-|---------|---------|--------|
-| **Latency** | ~2-5s | ~2-5s |
-| **Throughput** | Single | Batching (4x faster) |
-| **Dynamic Batching** | ❌ | ✅ |
-| **gRPC Support** | ❌ | ✅ |
-| **Model Management** | Manual | Automatic |
-| **Metrics** | Limited | Full Prometheus |
-| **Easy to Debug** | ✅ | ⚠️ |
-
-### File Structure After Integration
+### File Structure
 
 ```
 newbie-app/
-├── Dockerfile                          # FastAPI image
-├── docker-compose.yml                  # NEW: Orchestration
-├── requirements.txt                    # Unchanged
-├── README.md                           # Original
-├── TRITON_QUICKSTART.md               # NEW: Quick guide
-├── TRITON_GUIDE.md                    # NEW: Full guide
-│
-├── triton-models/                     # NEW: Model repository
-│   └── qwen3-vl/
-│       ├── config.pbtxt
-│       └── 1/
-│           └── model.py
-│
-├── triton-docker/                     # NEW: Triton Docker files
-│   ├── Dockerfile.triton
-│   ├── nginx.conf
-│   ├── requirements-triton.txt
-│   └── start-services.sh
+├── docker-compose.yml                  # Service orchestration
+├── requirements.txt                    # Pinned dependencies (with tritonclient)
+├── README.md                           # Project documentation
+├── TRITON_QUICKSTART.md               # Quick reference
+├── TRITON_GUIDE.md                    # Comprehensive guide
 │
 ├── agent/
-│   ├── serving/                       # Original + NEW: Triton models & docker
-│   │   ├── model_server.py
-│   │   ├── inference_engine.py
-│   │   ├── model_loader.py
-│   │   ├── triton-models/
-│   │   │   └── qwen3-vl/
-│   │   │       ├── config.pbtxt
-│   │   │       └── 1/
-│   │   │           └── model.py
+│   ├── memory/                         # RAG system (Qdrant + Redis)
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── vector_store.py
+│   │   ├── chunking.py
+│   │   └── retriever.py
+│   │
+│   ├── serving/
+│   │   ├── fastapi/
+│   │   │   └── src/                    # Legacy FastAPI (not actively used)
+│   │   │       └── ...
 │   │   │
-│   │   └── triton-docker/
-│   │       ├── Dockerfile.triton
-│   │       ├── nginx.conf
-│   │       ├── requirements-triton.txt
-│   │       └── start-services.sh
+│   │   └── triton/
+│   │       ├── models/
+│   │       │   └── qwen3-vl/           # Triton model repository
+│   │       │       ├── config.pbtxt
+│   │       │       └── 1/
+│   │       │           └── model.py
+│   │       │
+│   │       └── docker/
+│   │           ├── Dockerfile.triton   # Multi-stage image
+│   │           ├── nginx.conf          # Nginx routing
+│   │           └── requirements-triton.txt
+│   │
+│   └── client/
+│       ├── triton_client.py            # Triton client library
+│       └── extensions/vscode/          # VS Code extension
+```
 ```
 
 ### Next Steps (Optional)

@@ -1,22 +1,12 @@
 # Triton Integration - Quick Reference
 
-## Files Overview
+## Key Files
 
-### Model Repository
-- `agent/serving/triton/models/qwen3-vl/config.pbtxt` - Model configuration (Python backend)
-- `agent/serving/triton/models/qwen3-vl/1/model.py` - Triton Python backend implementation
-
-### Docker & Orchestration
-- `Dockerfile` - FastAPI image (legacy backend)
-- `agent/serving/triton/docker/Dockerfile.triton` - Multi-stage Triton image (dev/prod modes)
-- `agent/serving/triton/docker/nginx.conf` - Nginx routing config
-- `docker-compose.yml` - Service orchestration with GPU support
-
-### Client & Documentation
-- `agent/client/triton_client.py` - Python client for Triton
-- `TRITON_GUIDE.md` - Comprehensive documentation
-- `TRITON_INTEGRATION_SUMMARY.md` - Integration summary
-- `agent/serving/triton/docker/requirements-triton.txt` - Dependencies
+- `agent/serving/triton/models/qwen3-vl/config.pbtxt` - Model configuration
+- `agent/serving/triton/models/qwen3-vl/1/model.py` - Python backend
+- `agent/serving/triton/docker/Dockerfile.triton` - Docker image
+- `docker-compose.yml` - Service orchestration
+- `agent/client/triton_client.py` - Python client
 
 ## Quick Commands
 
@@ -28,12 +18,13 @@ docker compose up --build
 
 ### Development Mode (Fast Iteration)
 ```bash
-# Copy site-packages from host instead of pip install
+# For development, edit files and rebuild
 BUILD_MODE=dev docker compose up --build triton-server
 ```
 
 ### Production Mode (Clean Build)
 ```bash
+# For production deployments
 BUILD_MODE=prod docker compose up --build triton-server
 ```
 
@@ -46,9 +37,6 @@ curl http://localhost:8000/v2/health/live
 # Triton model metadata
 curl http://localhost:8000/v2/models/qwen3-vl
 
-# FastAPI health (legacy)
-curl http://localhost:8000/health
-
 # Test Triton Python client
 python agent/client/triton_client.py
 ```
@@ -57,7 +45,6 @@ python agent/client/triton_client.py
 ```bash
 docker compose logs -f
 docker compose logs triton-server  # Just Triton
-docker compose logs fastapi-server  # Just FastAPI
 ```
 
 ### Stop Services
@@ -78,66 +65,47 @@ docker inspect dsa-agent-triton --format='{{.State.Health.Status}}'
 | Triton | HTTP REST | 8000 | http://localhost:8000 |
 | Triton | gRPC | 8001 | localhost:8001 |
 | Triton | Metrics | 8002 | http://localhost:8002 |
-| FastAPI (legacy) | HTTP REST | 8000 | http://localhost:8000 |
-| Nginx | HTTP | 80 | http://localhost |
 
 ## Build Modes
 
 ### Development Mode (`BUILD_MODE=dev`)
-- **Purpose**: Fast iteration during development
-- **Method**: Copies site-packages from host via BuildKit `--from=site-packages`
-- **Speed**: Very fast (no pip install, just file copy)
-- **Use When**: Testing new packages, debugging, rapid prototyping
-- **Caveat**: Python version mismatch (host 3.12 → container 3.10) may cause issues
+- Fast iteration during development
+- Copies packages from host environment
+- **Note**: Requires compatible Python versions
 
 ### Production Mode (`BUILD_MODE=prod`)
-- **Purpose**: Clean, reproducible builds
-- **Method**: Installs all packages via pip during build
-- **Speed**: Slower (downloads and compiles packages)
-- **Use When**: Deployments, CI/CD, sharing images
-- **Benefit**: No host dependencies, guaranteed compatibility
+- Clean, reproducible builds
+- Installs all packages via pip
+- **Recommended** for deployments
 
 ## Key Features
 
-✅ **Triton Integration Complete:**
-- Multi-stage Docker builds (dev/prod separation)
+✅ **Triton Server:**
 - Python backend with custom model loading
-- Dynamic batching support (max_batch_size: 4)
-- GPU acceleration with NVIDIA Container Toolkit
+- Dynamic batching (max_batch_size: 4)
+- GPU acceleration
 - gRPC & HTTP support
-- Health checks (`/v2/health/ready`, `/v2/health/live`)
-- Metrics endpoint
-- BuildKit additional_contexts for site-packages
+- Health checks and metrics
+- Production ready
 
-✅ **GPU Support:**
-- `gpus: all` in docker-compose
-- NVIDIA runtime environment variables
-- Automatic device passthrough
-- GPU instance_group in model config
+✅ **RAG Integration:**
+- Qdrant vector database
+- Redis caching
+- Async retrieval
+- Token-aware chunking
 
-✅ **Backward Compatible:**
-- Original FastAPI server still works
-- Existing clients unaffected
-- Can run both services simultaneously
-
-✅ **Production Ready:**
+✅ **Complete Setup:**
 - Docker multi-stage builds
-- Service orchestration with depends_on
-- Health checks with retry logic
-- Volume mounts for models and configs
-- Environment-based configuration
+- Service orchestration
+- VS Code extension integration
+- Comprehensive documentation
 
-## Next Steps (Optional)
+## Next Steps
 
-1. **Benchmark Performance**: Compare FastAPI vs Triton inference latency
-2. **Add More Models**: Create additional model configs (ONNX, TensorRT-LLM, vLLM)
-3. **Scale with Replicas**: Use `docker compose up --scale triton-server=3`
-4. **Add Monitoring**: Integrate Prometheus/Grafana for metrics scraping
-5. **Optimize Model**: Try vLLM or TensorRT-LLM backends for faster inference
-6. **Deploy to Cloud**: Push images to registry and deploy to K8s/ECS
+1. **Verify Triton**: `curl http://localhost:8000/v2/health/ready`
+2. **Test Inference**: `python agent/client/triton_client.py`
+3. **Check VS Code Extension**: [agent/client/extensions/vscode/README.md](agent/client/extensions/vscode/README.md)
+4. **Setup RAG**: [agent/memory/](agent/memory/) for knowledge base integration
+5. **Optimize Performance**: [TRITON_PERFORMANCE.md](TRITON_PERFORMANCE.md)
 
-See `TRITON_GUIDE.md` for:
-- Detailed configuration options
-- Performance tuning
-- Troubleshooting
-- Advanced usage examples
+For detailed documentation, see [TRITON_GUIDE.md](TRITON_GUIDE.md)
