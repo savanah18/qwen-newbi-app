@@ -52,6 +52,14 @@ RUN pip install \
 # ============================================
 FROM ${BUILD_MODE}-stage AS final
 
+# Install Flash Attention 2 (latest version)
+# Requires: CUDA toolkit, ninja for faster builds
+RUN apt-get update && apt-get install -y ninja-build && rm -rf /var/lib/apt/lists/*
+
+# Install latest flash-attn from source
+RUN pip install packaging ninja
+RUN pip install flash-attn --no-build-isolation
+
 # Create model directory
 RUN mkdir -p /models
 

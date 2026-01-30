@@ -2,7 +2,7 @@
 
 ## Summary
 
-Triton Inference Server is the primary inference engine for the DSA Agent, providing GPU-accelerated model serving with dynamic batching support.
+Triton Inference Server is the primary inference engine for the Triton AI Chat system, providing GPU-accelerated model serving with dynamic batching support.
 
 ### What Was Added
 
@@ -194,7 +194,7 @@ docker-compose logs -f
 
 **Model not loading:**
 ```bash
-docker exec dsa-agent-triton python -m py_compile /models/qwen3-vl/1/model.py
+docker exec triton-ai-server python -m py_compile /models/qwen3-vl/1/model.py
 ```
 
 **Out of memory:**

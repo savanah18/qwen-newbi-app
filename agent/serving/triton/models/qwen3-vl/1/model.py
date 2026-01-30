@@ -104,47 +104,95 @@ class TritonPythonModel:
                 # Extract inputs
                 message = pb_utils.get_input_tensor_by_name(request, "message")
                 image_input = pb_utils.get_input_tensor_by_name(request, "image")
+                mode_input = pb_utils.get_input_tensor_by_name(request, "mode")
                 
-                # Convert to Python strings - handle 2D batched arrays
-                message_str = ""
-                if message is not None:
-                    msg_array = message.as_numpy()
-                    # msg_array is [batch=1, sequence=1] with dtype=object
-                    # Use .flat[0] to get the actual bytes regardless of shape
-                    message_bytes = msg_array.flat[0]
+                # Get batch size from message tensor shape
+                msg_array = message.as_numpy()
+                batch_size = msg_array.shape[0]
+                print(f"[Triton] Processing batch of {batch_size} requests")
+                
+                # Extract mode (same for all items in batch)
+                mode = "generate"
+                if mode_input is not None:
+                    mode_array = mode_input.as_numpy()
+                    mode_bytes = mode_array[0, 0] if mode_array.ndim > 1 else mode_array[0]
+                    mode = mode_bytes.decode('utf-8') if isinstance(mode_bytes, bytes) else mode_bytes
+                
+                # Process each item in the batch
+                batch_responses = []
+                batch_embeddings = []
+                batch_times = []
+                
+                for i in range(batch_size):
+                    # Extract message for this batch item
+                    message_bytes = msg_array[i, 0] if msg_array.ndim > 1 else msg_array[i]
                     message_str = message_bytes.decode('utf-8') if isinstance(message_bytes, bytes) else message_bytes
+                    
+                    # Extract image for this batch item (if provided)
+                    image_base64 = None
+                    if image_input is not None:
+                        img_array = image_input.as_numpy()
+                        if img_array.size > 0:
+                            image_bytes = img_array[i, 0] if img_array.ndim > 1 else img_array[i]
+                            if image_bytes:
+                                image_base64 = image_bytes.decode('utf-8') if isinstance(image_bytes, bytes) else image_bytes
+                    
+                    start_time = time.time()
+                    
+                    if mode == "embed":
+                        # Embedding extraction mode
+                        print(f"[Triton] [{i+1}/{batch_size}] Extracting embedding for: {message_str[:50]}...")
+                        embedding = self._extract_embedding(message_str, image_base64)
+                        response_time = time.time() - start_time
+                        print(f"[Triton] [{i+1}/{batch_size}] Embedding extracted in {response_time:.2f}s, dim={len(embedding)}")
+                        
+                        batch_responses.append(b"")
+                        batch_embeddings.append(embedding)
+                        batch_times.append(response_time)
+                        
+                    else:
+                        # Generation mode (default)
+                        print(f"[Triton] [{i+1}/{batch_size}] Starting inference for: {message_str[:50]}...")
+                        response_text = self._inference(message_str, image_base64)
+                        response_time = time.time() - start_time
+                        print(f"[Triton] [{i+1}/{batch_size}] Inference completed in {response_time:.2f}s")
+                        
+                        batch_responses.append(response_text.encode('utf-8'))
+                        batch_embeddings.append(np.array([], dtype=np.float32))
+                        batch_times.append(response_time)
                 
-                image_base64 = None
-                if image_input is not None:
-                    img_array = image_input.as_numpy()
-                    if img_array.size > 0:
-                        # Same approach - use .flat[0] to get actual bytes
-                        image_bytes = img_array.flat[0]
-                        image_base64 = image_bytes.decode('utf-8') if isinstance(image_bytes, bytes) else image_bytes
+                # Construct batch response tensors
+                if mode == "embed":
+                    # Stack embeddings into batch
+                    response_tensor = pb_utils.Tensor(
+                        "response",
+                        np.array(batch_responses, dtype=object).reshape(batch_size, 1)
+                    )
+                    embedding_tensor = pb_utils.Tensor(
+                        "embedding",
+                        np.stack(batch_embeddings).astype(np.float32)
+                    )
+                    time_tensor = pb_utils.Tensor(
+                        "response_time",
+                        np.array(batch_times, dtype=np.float32).reshape(batch_size, 1)
+                    )
+                else:
+                    # Generation mode
+                    response_tensor = pb_utils.Tensor(
+                        "response",
+                        np.array(batch_responses, dtype=object).reshape(batch_size, 1)
+                    )
+                    embedding_tensor = pb_utils.Tensor(
+                        "embedding",
+                        np.zeros((batch_size, 0), dtype=np.float32)
+                    )
+                    time_tensor = pb_utils.Tensor(
+                        "response_time",
+                        np.array(batch_times, dtype=np.float32).reshape(batch_size, 1)
+                    )
                 
-                # Process inference
-                start_time = time.time()
-                print(f"[Triton] Starting inference for message: {message_str[:50]}...")
-                response_text = self._inference(message_str, image_base64)
-                response_time = time.time() - start_time
-                print(f"[Triton] Inference completed in {response_time:.2f}s")
-                
-                # Prepare output tensors
-                # response: [batch_size] with TYPE_STRING
-                response_tensor = pb_utils.Tensor(
-                    "response",
-                    np.array([response_text.encode('utf-8')], dtype=object)
-                )
-                
-                # response_time: [batch_size] with TYPE_FP32, dims=[1] in config means per-batch scalar
-                time_tensor = pb_utils.Tensor(
-                    "response_time",
-                    np.array([response_time], dtype=np.float32)
-                )
-                
-                # Create response
                 response = pb_utils.InferenceResponse(
-                    output_tensors=[response_tensor, time_tensor]
+                    output_tensors=[response_tensor, embedding_tensor, time_tensor]
                 )
                 responses.append(response)
                 
@@ -161,6 +209,10 @@ class TritonPythonModel:
                             np.array([f"Error: {str(e)}".encode('utf-8')], dtype=object)
                         ),
                         pb_utils.Tensor(
+                            "embedding",
+                            np.array([[]], dtype=np.float32).reshape(1, 0)
+                        ),
+                        pb_utils.Tensor(
                             "response_time",
                             np.array([0.0], dtype=np.float32)
                         )
@@ -169,6 +221,60 @@ class TritonPythonModel:
                 responses.append(error_response)
         
         return responses
+    
+    def _extract_embedding(self, message: str, image_base64: Optional[str]) -> np.ndarray:
+        """Extract embedding vector from the message."""
+        if not message.strip():
+            return np.array([], dtype=np.float32)
+        
+        # Build content
+        content = [{"type": "text", "text": message}]
+        
+        # Decode image if provided
+        image = None
+        if image_base64:
+            try:
+                image_data = base64.b64decode(image_base64)
+                image = Image.open(io.BytesIO(image_data))
+                content.append({"type": "image", "image": image})
+            except Exception as e:
+                print(f"Warning: Failed to decode image: {str(e)}")
+        
+        messages = [{"role": "user", "content": content}]
+        
+        # Prepare inputs
+        inputs = self.processor.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=False,
+            return_dict=True,
+            return_tensors="pt"
+        )
+        inputs = inputs.to(self.model.device)
+        
+        # Extract hidden states
+        with torch.no_grad():
+            outputs = self.model(
+                **inputs,
+                output_hidden_states=True,
+                return_dict=True
+            )
+            hidden_states = outputs.hidden_states[-1]  # Last layer
+            
+            # Mean pooling
+            if 'attention_mask' in inputs:
+                mask_expanded = inputs['attention_mask'].unsqueeze(-1).expand(hidden_states.size())
+                sum_embeddings = torch.sum(hidden_states * mask_expanded, dim=1)
+                sum_mask = torch.clamp(mask_expanded.sum(dim=1), min=1e-9)
+                pooled = sum_embeddings / sum_mask
+            else:
+                pooled = torch.mean(hidden_states, dim=1)
+            
+            # Normalize
+            embedding = pooled.cpu().numpy().squeeze()
+            embedding = embedding / (np.linalg.norm(embedding) + 1e-9)
+        
+        return embedding
     
     def _inference(self, message: str, image_base64: Optional[str]) -> str:
         """Perform inference on the message."""

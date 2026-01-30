@@ -11,15 +11,15 @@ const TRITON_MODEL_READY_ENDPOINT = `${TRITON_HTTP_URL}/v2/models/${TRITON_MODEL
 const MAX_MESSAGES_IN_UI = 100; // Limit chat display to prevent memory issues
 
 export function activate(context: vscode.ExtensionContext): void {
-  const helloDisposable = vscode.commands.registerCommand('dsaAgent.helloWorld', () => {
-    vscode.window.showInformationMessage('🚀 DSA Agent Ready - Your data structure & algorithm learning companion is active!');
+  const startDisposable = vscode.commands.registerCommand('tritonAI.start', () => {
+    vscode.window.showInformationMessage('🚀 Triton AI Chat Ready - Generic AI assistant powered by Triton Inference Server is active!');
   });
 
-  const chatDisposable = vscode.commands.registerCommand('dsaAgent.openChat', () => {
+  const chatDisposable = vscode.commands.registerCommand('tritonAI.openChat', () => {
     ChatPanel.createOrShow(context);
   });
 
-  context.subscriptions.push(helloDisposable, chatDisposable);
+  context.subscriptions.push(startDisposable, chatDisposable);
 }
 
 export function deactivate(): void {
@@ -33,7 +33,7 @@ class ChatPanel {
     {
       id: 1,
       sender: 'assistant',
-      text: '🤖 DSA Agent Activated (Triton-Powered)\n\nHey! I\'m your agentic assistant for data structures, algorithms, and competitive programming, now powered by Triton Inference Server for optimal performance. Ask me about:\n• Algorithm design and implementation\n• Data structure selection and optimization\n• Time/space complexity analysis\n• Interview problem strategies\n• Code optimization techniques\n\nLet\'s master DSA together!',
+      text: '🤖 Triton AI Chat Assistant\n\nHello! I\'m a versatile AI assistant powered by Triton Inference Server with Qwen3-VL-8B-Instruct. I support:\n• Real-time text generation (max 32 batch)\n• Embedding extraction and vectorization\n• Multimodal input (text + images)\n• Fast inference with response timing\n• Flexible model configuration\n\nWhat would you like to know or discuss?',
     },
   ];
   private nextId = 2;
@@ -43,8 +43,8 @@ class ChatPanel {
 
   private constructor(private readonly context: vscode.ExtensionContext) {
     this.panel = vscode.window.createWebviewPanel(
-      'dsaAgentChat',
-      'DSA Agent Chat',
+      'tritonAIChat',
+      'Triton AI Chat',
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
@@ -135,9 +135,9 @@ class ChatPanel {
 
       try {
         const startTime = Date.now();
-        console.log('[DSA Agent] Sending request to Triton:', userMsg.text);
+        console.log('[Triton AI] Sending request to Triton:', userMsg.text);
         
-        // Build Triton inference request
+        // Build Triton inference request with mode parameter
         const tritonRequest = {
           inputs: [
             {
@@ -145,7 +145,17 @@ class ChatPanel {
               shape: [1, 1],
               datatype: 'BYTES',
               data: [userMsg.text]
+            },
+            {
+              name: 'mode',
+              shape: [1, 1],
+              datatype: 'BYTES',
+              data: ['generate']  // Use 'generate' for text generation, 'embed' for embeddings
             }
+          ],
+          outputs: [
+            { name: 'response' },
+            { name: 'response_time' }
           ]
         };
 
@@ -157,34 +167,35 @@ class ChatPanel {
 
         if (response.ok) {
           const data = (await response.json()) as { 
-            outputs: Array<{ name: string; data: string[] }> 
+            outputs: Array<{ name: string; data: string[]; shape: number[] }> 
           };
           
-          console.log('[DSA Agent] Received response from Triton:', data);
+          console.log('[Triton AI] Received response from Triton:', data);
           
           // Extract response and response_time from outputs
           const responseOutput = data.outputs.find(o => o.name === 'response');
           const timeOutput = data.outputs.find(o => o.name === 'response_time');
           
+          // Handle both single and batch responses
           const responseText = responseOutput?.data[0] || 'No response';
           const responseTime = timeOutput?.data[0] || 0;
           const totalTime = (Date.now() - startTime) / 1000;
           
-          console.log('[DSA Agent] Total time:', totalTime, 'Model time:', responseTime);
+          console.log('[Triton AI] Total time:', totalTime, 'Model time:', responseTime);
           
-          const displayText = `${responseText}\n\n⏱️ Model: ${Number(responseTime).toFixed(2)}s | Total: ${totalTime.toFixed(2)}s`;
+          const displayText = `${responseText}\n\n⏱️ Model: ${Number(responseTime).toFixed(2)}s | Total: ${totalTime.toFixed(2)}s | Triton: ${TRITON_MODEL_NAME}`;
           
           // Remove loading message and add real response
           this.messages.pop();
           this.addMessage('assistant', displayText);
         } else {
           const errorText = await response.text();
-          console.error('[DSA Agent] Triton error:', errorText);
+          console.error('[Triton AI] Triton error:', errorText);
           this.messages.pop();
           this.addMessage('assistant', `Triton error: ${errorText}`);
         }
       } catch (error) {
-        console.error('[DSA Agent] Connection error:', error);
+        console.error('[Triton AI] Connection error:', error);
         this.messages.pop();
         this.addMessage('assistant', `Error: Cannot connect to Triton server - ${error}`);
       } finally {
@@ -223,7 +234,7 @@ class ChatPanel {
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DSA Agent Chat</title>
+  <title>Triton AI Chat</title>
   <style>
     * { box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #0b1220; color: #e2e8f0; }
@@ -249,7 +260,7 @@ class ChatPanel {
 <body>
   <header>
     <div>
-      <div class="header-title">🤖 DSA Agent (Triton)</div>
+      <div class="header-title">🤖 Triton AI Chat</div>
       <div class="header-status" id="status-text">Checking Triton server...</div>
     </div>
     <div class="controls">
