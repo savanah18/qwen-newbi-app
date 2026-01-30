@@ -10,3 +10,19 @@ env/
 # Logs
 *.log
 logs/
+
+# Certificates and keys
+*.pem
+*.crt
+*.key
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+certs/
+certificates/
+
+# Data directories
+data/

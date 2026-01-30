@@ -30,6 +30,7 @@ from .config import (
 
 from .embeddings import (
     VLM2VecEmbeddings,
+    TritonEmbeddings,
     SentenceTransformerEmbeddings,
     create_embedding_service
 )
@@ -64,6 +65,7 @@ __all__ = [
     
     # Embeddings
     "VLM2VecEmbeddings",
+    "TritonEmbeddings",
     "SentenceTransformerEmbeddings",
     "create_embedding_service",
     
@@ -88,22 +90,36 @@ __all__ = [
 
 # Factory function for complete RAG system
 async def create_rag_system(
-    model,
-    processor,
-    config: RAGConfig = None
+    model=None,
+    processor=None,
+    config: RAGConfig = None,
+    use_triton: bool = True,
+    triton_url: str = "localhost:8000"
 ):
     """
     Create a complete RAG system with all components initialized.
     
     Args:
-        model: Qwen3-VL model instance
-        processor: Qwen3-VL processor instance
+        model: Qwen3-VL model instance (required if use_triton=False)
+        processor: Qwen3-VL processor instance (required if use_triton=False)
         config: Optional RAGConfig (uses defaults if None)
+        use_triton: If True, use Triton server for embeddings (recommended)
+        triton_url: Triton server URL (if use_triton=True)
         
     Returns:
         RAGRetriever instance ready to use
         
-    Example:
+    Example (with Triton - recommended):
+        >>> from agent.memory import create_rag_system
+        >>> 
+        >>> # Create RAG system with Triton
+        >>> rag = await create_rag_system(use_triton=True)
+        >>> 
+        >>> # Use it
+        >>> results = await rag.retrieve_context("Explain binary search")
+        >>> context = rag.format_context_for_llm(results)
+    
+    Example (with local model):
         >>> from agent.memory import create_rag_system
         >>> from agent.serving.fastapi.src.model_loader import ModelLoader
         >>> 
@@ -115,22 +131,25 @@ async def create_rag_system(
         >>> )
         >>> 
         >>> # Create RAG system
-        >>> rag = await create_rag_system(model, processor)
-        >>> 
-        >>> # Use it
-        >>> results = await rag.retrieve_context("Explain binary search")
-        >>> context = rag.format_context_for_llm(results)
+        >>> rag = await create_rag_system(model, processor, use_triton=False)
     """
     if config is None:
         config = get_rag_config()
     
     # Create embedding service
-    embedder = VLM2VecEmbeddings(
-        model=model,
-        processor=processor,
-        pooling_strategy=config.embedding.pooling_strategy,
-        normalize=config.embedding.normalize
-    )
+    if use_triton:
+        embedder = TritonEmbeddings(triton_url=triton_url)
+        print(f"✓ Using Triton server at {triton_url}")
+    else:
+        if model is None or processor is None:
+            raise ValueError("model and processor required when use_triton=False")
+        embedder = VLM2VecEmbeddings(
+            model=model,
+            processor=processor,
+            pooling_strategy=config.embedding.pooling_strategy,
+            normalize=config.embedding.normalize
+        )
+        print("✓ Using local VLM2Vec embeddings")
     
     # Create vector store
     vector_store = QdrantVectorStore(config.qdrant)

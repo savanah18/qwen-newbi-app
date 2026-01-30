@@ -1,6 +1,7 @@
 """
 Embedding service for generating vector representations using Qwen3-VL.
 Extracts hidden states from the vision-language model for RAG.
+Supports both local model inference and Triton server inference.
 """
 
 from typing import List, Optional, Dict, Any, Union
@@ -244,6 +245,154 @@ class VLM2VecEmbeddings:
         return self.embedding_dim
 
 
+class TritonEmbeddings:
+    """
+    Embedding service using Triton Inference Server.
+    
+    This class connects to a running Triton server and uses it to generate
+    embeddings via the Qwen3-VL model deployed on Triton. This is more
+    efficient than loading the model directly as it leverages Triton's
+    dynamic batching and optimized inference.
+    """
+    
+    def __init__(
+        self,
+        triton_url: str = "localhost:8000",
+        model_name: str = "qwen3-vl",
+        use_grpc: bool = False,
+        embedding_dim: int = 3584  # Qwen3-VL hidden size
+    ):
+        """
+        Initialize Triton embedding service.
+        
+        Args:
+            triton_url: Triton server URL (host:port)
+            model_name: Model name on Triton server
+            use_grpc: Whether to use gRPC (True) or HTTP (False)
+            embedding_dim: Dimension of embeddings
+        """
+        # Import here to avoid circular dependency
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        
+        if use_grpc:
+            from agent.client.triton_client import TritonGrpcClient
+            self.client = TritonGrpcClient(triton_url, model_name)
+        else:
+            from agent.client.triton_client import TritonHttpClient
+            self.client = TritonHttpClient(triton_url, model_name)
+        
+        self.embedding_dim = embedding_dim
+        
+        # Check server health
+        if not self.client.check_health():
+            raise RuntimeError(f"Triton server at {triton_url} is not healthy")
+        
+        print(f"Connected to Triton server at {triton_url}")
+        print(f"Embedding dimension: {self.embedding_dim}")
+    
+    def embed_text(self, text: str) -> np.ndarray:
+        """
+        Generate embedding for text only.
+        
+        Args:
+            text: Input text to embed
+            
+        Returns:
+            numpy array of shape (embedding_dim,)
+        """
+        embedding, _ = self.client.chat(text, mode="embed")
+        return embedding
+    
+    def embed_multimodal(self, text: str, image: Image.Image) -> np.ndarray:
+        """
+        Generate embedding for text + image pair.
+        
+        Args:
+            text: Input text
+            image: PIL Image
+            
+        Returns:
+            numpy array of shape (embedding_dim,)
+        """
+        embedding, _ = self.client.chat(text, image=image, mode="embed")
+        return embedding
+    
+    def embed_batch(
+        self, 
+        items: List[Dict[str, Any]], 
+        batch_size: int = 16
+    ) -> List[np.ndarray]:
+        """
+        Generate embeddings for multiple items in batches.
+        
+        Args:
+            items: List of dicts with 'text' and optional 'image' keys
+            batch_size: Number of items to process at once (Triton handles batching)
+            
+        Returns:
+            List of numpy arrays, one per item
+        """
+        embeddings = []
+        
+        # Extract texts and images
+        texts = [item.get('text', '') for item in items]
+        images = [item.get('image', None) for item in items]
+        
+        # Process in batches
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            batch_images = images[i:i + batch_size]
+            
+            # Check if any images in this batch
+            has_images = any(img is not None for img in batch_images)
+            
+            if has_images:
+                # Process items individually if mixed modalities
+                for text, image in zip(batch_texts, batch_images):
+                    if image is not None:
+                        emb = self.embed_multimodal(text, image)
+                    else:
+                        emb = self.embed_text(text)
+                    embeddings.append(emb)
+            else:
+                # Use batch API for text-only
+                results = self.client.batch_chat(batch_texts, mode="embed")
+                batch_embeddings = [emb for emb, _ in results]
+                embeddings.extend(batch_embeddings)
+        
+        return embeddings
+    
+    def embed_from_base64(self, text: str, image_base64: Optional[str] = None) -> np.ndarray:
+        """
+        Convenience method for API endpoints that receive base64 images.
+        
+        Args:
+            text: Input text
+            image_base64: Base64-encoded image string
+            
+        Returns:
+            Embedding vector
+        """
+        image = None
+        if image_base64:
+            try:
+                image_data = base64.b64decode(image_base64)
+                image = Image.open(io.BytesIO(image_data))
+            except Exception as e:
+                print(f"Warning: Failed to decode image: {e}")
+        
+        if image:
+            return self.embed_multimodal(text, image)
+        else:
+            return self.embed_text(text)
+    
+    def get_embedding_dimension(self) -> int:
+        """Return the dimensionality of embeddings."""
+        return self.embedding_dim
+
+
 class SentenceTransformerEmbeddings:
     """
     Alternative embedding service using sentence-transformers.
@@ -294,24 +443,30 @@ class SentenceTransformerEmbeddings:
 
 # Factory function to create appropriate embedding service
 def create_embedding_service(
-    strategy: str = "vlm2vec",
+    strategy: str = "triton",
     model = None,
     processor = None,
+    triton_url: str = "localhost:8000",
     **kwargs
-) -> Union[VLM2VecEmbeddings, SentenceTransformerEmbeddings]:
+) -> Union[VLM2VecEmbeddings, TritonEmbeddings, SentenceTransformerEmbeddings]:
     """
     Factory to create embedding service.
     
     Args:
-        strategy: "vlm2vec" for Qwen3-VL, "sentence-transformer" for text-only
+        strategy: "triton" for Triton server (recommended), "vlm2vec" for local model, 
+                 "sentence-transformer" for text-only
         model: Qwen3-VL model (required for vlm2vec)
         processor: Qwen3-VL processor (required for vlm2vec)
+        triton_url: Triton server URL (for triton strategy)
         **kwargs: Additional arguments for embedding service
         
     Returns:
         Embedding service instance
     """
-    if strategy == "vlm2vec":
+    if strategy == "triton":
+        return TritonEmbeddings(triton_url=triton_url, **kwargs)
+    
+    elif strategy == "vlm2vec":
         if model is None or processor is None:
             raise ValueError("model and processor required for vlm2vec strategy")
         return VLM2VecEmbeddings(model, processor, **kwargs)
