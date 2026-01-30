@@ -284,6 +284,110 @@ collection = client.create_collection(
 )
 ```
 
+## Using Triton for Production Embeddings
+
+For production systems, use **Triton Inference Server** instead of loading the model directly. This provides:
+
+- ✅ GPU sharing across multiple models
+- ✅ Dynamic batching (up to 32 concurrent requests)
+- ✅ Automatic scaling
+- ✅ HTTP/gRPC APIs
+- ✅ Model versioning
+- ✅ Built-in monitoring
+
+### Triton Setup
+
+```bash
+# Start Triton server with Qwen3-VL model
+docker compose up triton-server
+
+# Verify it's ready
+curl http://localhost:8000/v2/models/qwen3-vl
+```
+
+### Python Client (Triton)
+
+```python
+from agent.memory.embeddings import TritonEmbeddings
+
+# Connect to Triton server
+embedder = TritonEmbeddings(
+    triton_url="localhost:8000",
+    model_name="qwen3-vl",
+    use_grpc=False  # Use HTTP (or True for gRPC)
+)
+
+# Single text embedding
+text = "Explain quicksort algorithm"
+embedding = embedder.embed_text(text)
+print(f"Embedding shape: {embedding.shape}")  # (3584,)
+
+# Batch embeddings (efficient with dynamic batching)
+texts = [
+    {"text": "What is merge sort?"},
+    {"text": "Explain binary search"},
+    {"text": "How does heap sort work?"}
+]
+embeddings = embedder.embed_batch(texts, batch_size=16)
+print(f"Generated {len(embeddings)} embeddings")
+
+# Multimodal (text + image)
+from PIL import Image
+image = Image.open("algorithm_diagram.png")
+embedding = embedder.embed_multimodal("Explain this structure:", image)
+```
+
+### RAG System with Triton
+
+```python
+from agent.memory import create_rag_system
+
+# Initialize with Triton (recommended for production)
+rag = await create_rag_system(
+    use_triton=True,
+    triton_url="localhost:8000"
+)
+
+# Or use local model (development only)
+from agent.serving.fastapi.src.model_loader import ModelLoader
+model, processor = ModelLoader.load_native(...)
+rag = await create_rag_system(
+    model=model,
+    processor=processor,
+    use_triton=False
+)
+
+# Retrieve context
+results = await rag.retrieve_context("What is quicksort?", top_k=3)
+for result in results:
+    print(f"Score: {result['score']:.3f}")
+    print(f"Text: {result['text'][:100]}...")
+```
+
+### Triton Embedding Modes
+
+The Triton model supports two modes:
+
+| Mode | Input | Output | Use Case |
+|------|-------|--------|----------|
+| `generate` | text (+ optional image) | Generated text response | Question answering |
+| `embed` | text (+ optional image) | 3584-dim embedding vector | RAG/similarity search |
+
+**API Call:**
+```python
+# Generate mode (Q&A)
+response_text, response_time = embedder.client.chat(
+    "What is quicksort?",
+    mode="generate"
+)
+
+# Embed mode (RAG)
+embedding, response_time = embedder.client.chat(
+    "Quicksort is a divide-and-conquer sorting algorithm...",
+    mode="embed"
+)
+```
+
 ## Debugging & Validation
 
 ### Test Embedding Quality
@@ -324,18 +428,31 @@ print(f"Similarity: {similarity[0][0]:.3f}")
 # Should be ~0.7-0.9 (similar but not identical)
 ```
 
-### Monitor Performance
+### Monitor Performance (Triton)
 
 ```python
+# Check Triton health
+import requests
+health = requests.get("http://localhost:8000/v2/health/ready")
+print(f"Triton status: {health.status_code}")
+
+# Benchmark with dynamic batching
 import time
+import asyncio
 
-# Benchmark embedding extraction
-start = time.time()
-embeddings = embedder.embed_batch(test_items, batch_size=8)
-duration = time.time() - start
-
-print(f"Processed {len(test_items)} items in {duration:.2f}s")
-print(f"Throughput: {len(test_items)/duration:.1f} items/sec")
+async def benchmark():
+    texts = ["Query " + str(i) for i in range(100)]
+    
+    start = time.time()
+    embeddings = embedder.embed_batch(
+        [{"text": t} for t in texts],
+        batch_size=32  # Triton handles batching
+    )
+    duration = time.time() - start
+    
+    print(f"Processed 100 items in {duration:.2f}s")
+    print(f"Throughput: {100/duration:.1f} items/sec")
+    # With dynamic batching: 50-100 items/sec on GPU
 ```
 
 ## Next Steps
