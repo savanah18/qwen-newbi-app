@@ -65,7 +65,7 @@ The platform uses a **disaggregated architecture** with multiple backend serving
 - **Backend Options**:
   - **FastAPI Server** (`agent/serving/fastapi`): Legacy server on port 8000
   - **Triton Inference Server** (`agent/serving/triton`): Production-grade GPU inference on ports 8000-8002 (HTTP/gRPC/Metrics)
-- **VS Code Extension** (`agent/client/extensions/vscode`): DSA Agent extension providing editor-integrated learning
+- **VS Code Extension** (`agent/client/extensions/vscode`): Triton AI Chat extension providing editor-integrated AI assistance
 - **RAG System** (`agent/memory`): Retrieval-Augmented Generation with Qdrant vector database and Redis caching
 - **Docker Compose**: Orchestrates all services with GPU support, health checks, and volume mounts
 
@@ -79,7 +79,7 @@ The platform now includes a **production-grade RAG (Retrieval-Augmented Generati
 - **Embeddings**: VLM2Vec from Qwen3-VL (4096-dimensional embeddings)
 - **Caching Layer**: Redis for embedding and query caching
 - **Optimizations**: HNSW indexing, async operations, batch processing
-- **Knowledge Base**: DSA algorithms, code examples, complexity analysis
+- **Knowledge Base**: Documents, code examples, reference materials
 
 **RAG Services:**
 - Qdrant: `http://localhost:6333` (HTTP API), `localhost:6334` (gRPC)
@@ -87,7 +87,7 @@ The platform now includes a **production-grade RAG (Retrieval-Augmented Generati
 
 ## Features
 
-- **VS Code Extension (DSA Agent)**: Agentic assistant integrated directly into your editor
+- **VS Code Extension (Triton AI Chat)**: AI assistant integrated directly into your editor
 - **Agentic Chat**: AI-powered responses on algorithm and data structure concepts
 - **RAG-Enhanced Responses**: Context-aware answers using vector database retrieval
 - **Multi-Domain Support**: Covers algorithm design, data structures, complexity analysis, interview prep
@@ -104,48 +104,49 @@ The platform now includes a **production-grade RAG (Retrieval-Augmented Generati
 - **API Documentation**: Auto-generated interactive API docs via FastAPI/Triton
 - **Environment-based Config**: All settings configurable via environment variables
 
-## DSA Agent - VS Code Extension
+## Triton AI Chat - VS Code Extension
 
 ### Overview
 
-We've introduced **DSA Agent**, a VS Code extension that transforms the editor into an intelligent learning companion for data structures and algorithms (DSA). Rather than switching between your code and a browser window, DSA Agent brings contextual AI assistance directly into VS Code.
+**Triton AI Chat** is a VS Code extension that transforms the editor into an intelligent AI assistant powered by Triton Inference Server. Rather than switching between your code and external tools, Triton AI Chat brings powerful multimodal AI assistance directly into VS Code.
 
-![DSA Agent Extension - Work in Progress](docs/figures/poc-vscode-ext.png)
+![Triton AI Chat Extension](docs/figures/poc-vscode-ext.png)
 
-> 🚧 **Work in Progress**: The extension is in active development. The screenshot above shows current capabilities with more features coming soon.
+> ✅ **Production Ready**: The extension supports batch inference, embedding extraction, multimodal input, and real-time performance monitoring.
 
-**Why This Rebrand?**
+**Key Benefits:**
 
-The original "newbie-app" was generic and unfocused. By rebranding as **DSA Agent**, we've:
-1. **Defined a clear purpose**: Not a generic chatbot, but a specialized agentic assistant for DSA learning
-2. **Aligned with the model server**: Leverages the same AI infrastructure (Qwen3-VL) for consistent responses
-3. **Positioned as an agent**: Emphasizes future autonomous capabilities (code generation, problem solving, test validation)
-4. **Created developer focus**: Targets competitive programmers and interview prep candidates
-5. **Enabled extension development**: Demonstrates how to build intelligent VS Code plugins with REST API backends
+1. **Generic AI Assistant**: Not limited to specific use cases - adaptable to any domain
+2. **High Performance**: Powered by Triton Inference Server with batch processing (up to 32 concurrent)
+3. **Aligned with Model Server**: Leverages the same AI infrastructure (Qwen3-VL) for consistent responses
+4. **Multimodal Support**: Handles both text and image inputs seamlessly
+5. **Extensible Architecture**: Demonstrates how to build intelligent VS Code plugins with REST API backends
+6. **Production Ready**: Comprehensive error handling, health monitoring, and performance metrics
 
 ### Current Capabilities
 
-- Real-time chat with agentic responses on algorithm and data structure questions
-- Algorithm explanations with complexity analysis (Time/Space)
-- Data structure selection guidance with trade-offs
-- Interview problem-solving strategies
-- Code review and optimization suggestions
+- Real-time chat with AI-powered responses on any topic
+- Batch inference support (up to 32 concurrent requests)
+- Embedding extraction for semantic search and RAG applications
+- Multimodal input (text + images via base64)
 - Server health monitoring and model status display
+- Response timing metrics for performance tracking
+- Message history with clear/reset functionality
 
 ### Future Roadmap (Upcoming Features)
 
-- **Code Generation Agent**: Generate algorithm implementations from descriptions
-- **Problem-Solving Agent**: Step-by-step solution generation for coding problems
-- **Test Case Generator**: Automatically create and validate test cases
-- **Complexity Visualizer**: Visual analysis of time/space complexity
+- **Context Window Management**: Sliding window for long conversations
+- **RAG Integration**: Knowledge base retrieval for enhanced responses
+- **Function Calling**: Tool use and external API integration
+- **Custom Model Switching**: Support for different models on-the-fly
 - **LeetCode/HackerRank Integration**: Pull problems directly into the extension
 - **Interview Simulator**: Mock interview mode with real-time feedback
 - **Visual Walkthroughs**: Animated algorithm execution traces
 - **Offline Mode**: Local model inference without server dependency
 
-### Advanced Roadmap: Specialized DSA Agents (v2.0+)
+### Advanced Roadmap: Specialized AI Agents (v2.0+)
 
-The long-term vision includes **domain-specific agentic modules** that work together to provide end-to-end DSA mastery:
+The long-term vision includes **domain-specific agentic modules** that work together to provide comprehensive AI assistance:
 
 #### 1. **Problem Curator Agent** 🎯
 Intelligent problem recommendation engine that:
@@ -236,12 +237,12 @@ npm run compile
 npm run package
 
 # Install in VS Code
-# Extensions → Install from VSIX → select dsa-agent-0.1.0.vsix
+# Extensions → Install from VSIX → select triton-ai-chat-0.2.0.vsix
 ```
 
 Then in VS Code Command Palette:
-- `DSA Agent: Start` - Welcome message and status check
-- `DSA Agent: Open Assistant` - Open the chat panel
+- `Triton AI: Start` - Welcome message and status check
+- `Triton AI: Open Chat Assistant` - Open the chat panel
 
 ### Architecture
 
@@ -415,7 +416,7 @@ INFO:     Started server process [XXXX]
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 ```
 
-### 4. Install DSA Agent VS Code Extension
+### 4. Install Triton AI Chat VS Code Extension
 
 **Option A: Build from source**
 ```bash
@@ -425,22 +426,22 @@ npm run compile
 npm run package
 ```
 
-Then in VS Code: `Extensions → Install from VSIX → select dsa-agent-0.1.0.vsix`
+Then in VS Code: `Extensions → Install from VSIX → select triton-ai-chat-0.2.0.vsix`
 
 **Option B: Use pre-built package**
 ```bash
 # Copy the .vsix file if available
-cp agent/client/extensions/vscode/dsa-agent-0.1.0.vsix ~/Downloads/
+cp agent/client/extensions/vscode/triton-ai-chat-0.2.0.vsix ~/Downloads/
 ```
 
-Then in VS Code: `Extensions → Install from VSIX → ~/Downloads/dsa-agent-0.1.0.vsix`
+Then in VS Code: `Extensions → Install from VSIX → ~/Downloads/triton-ai-chat-0.2.0.vsix`
 
-### 5. Use DSA Agent
+### 5. Use Triton AI Chat
 
 With both the backend running and extension installed:
 
 1. Open VS Code Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Run `DSA Agent: Open Assistant` to open the chat panel
+2. Run `Triton AI: Open Chat Assistant` to open the chat panel
 3. Ensure the status shows "Model: Loaded | Status: ok"
 4. Start asking questions about data structures, algorithms, or interview prep
 5. Click **Check Status** to verify Triton server connection
@@ -575,9 +576,9 @@ To use AWQ/GPTQ quantization, you need to either:
 - **GPU acceleration** is automatic via `device_map="auto"` in model loading
 - Model loads on server startup - expect 30-60 second initialization time on first run
 - Logs are stored in `logs/` directory for debugging
-- DSA Agent is designed for educational use and technical interview preparation
+- Triton AI Chat is designed for educational use and AI experimentation
 - The disaggregated architecture allows easy addition of new client interfaces (CLI, mobile, etc.)
 
 ---
 
-**Happy learning! Master DSA with AI-powered guidance. 🚀**
+**Happy exploring! Leverage AI-powered assistance for your projects. 🚀**

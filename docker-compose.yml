@@ -34,7 +34,7 @@ services:
               count: 1
               capabilities: [gpu]
     networks:
-      - dsa-network
+      - triton-ai-network
 
   # Triton Inference Server
   triton-server:

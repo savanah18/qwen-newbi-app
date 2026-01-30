@@ -264,7 +264,7 @@ class RAGRetriever:
         """
         if system_prompt is None:
             system_prompt = (
-                "You are a DSA (Data Structures & Algorithms) teaching assistant. "
+                "You are a helpful AI assistant. "
                 "Use the provided context to answer questions accurately. "
                 "If the context doesn't contain enough information, say so and provide your best answer."
             )

@@ -125,7 +125,7 @@ embeddings = embedder.embed_batch(items, batch_size=8)
 import chromadb
 client = chromadb.Client()
 collection = client.create_collection(
-    name="dsa_knowledge",
+    name="knowledge_base",
     metadata={"dimension": embedder.get_embedding_dimension()}
 )
 
@@ -275,7 +275,7 @@ Or use **Product Quantization** in vector DB:
 ```python
 # ChromaDB with HNSW + PQ
 collection = client.create_collection(
-    name="dsa_knowledge",
+    name="knowledge_base",
     metadata={
         "hnsw:space": "cosine",
         "hnsw:construction_ef": 200,
@@ -341,7 +341,7 @@ print(f"Throughput: {len(test_items)/duration:.1f} items/sec")
 ## Next Steps
 
 1. **Implement in RAG pipeline** - See [RAG_INTEGRATION_PLAN.md](../RAG_INTEGRATION_PLAN.md) Phase 2
-2. **Test with DSA content** - Evaluate retrieval quality
+2. **Test with sample content** - Evaluate retrieval quality
 3. **Optimize for production** - Batch processing, caching
 4. **Monitor in production** - Track latency, quality metrics
 

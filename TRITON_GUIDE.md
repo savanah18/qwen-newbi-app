@@ -245,7 +245,7 @@ deploy:
 3. Check Triton logs: `docker-compose logs triton-server`
 4. Ensure model.py has no syntax errors:
    ```bash
-   docker exec dsa-agent-triton python -m py_compile /models/qwen3-vl/1/model.py
+   docker exec triton-ai-server python -m py_compile /models/qwen3-vl/1/model.py
    ```
 
 ### Slow inference

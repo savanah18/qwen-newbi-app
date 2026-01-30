@@ -6,7 +6,7 @@ set -e
 PROJECT_ROOT=$(pwd)
 
 echo "=================================================="
-echo "Building DSA Agent with Triton Integration"
+echo "Building Triton AI Chat with Triton Integration"
 echo "=================================================="
 
 # Check if docker-compose is available

@@ -1,13 +1,13 @@
 # RAG Integration Plan with VLM2Vec Embeddings
 
 ## Overview
-This document outlines a phased approach to integrate Retrieval-Augmented Generation (RAG) into the DSA Agent using VLM2Vec embeddings for multimodal (text + image) retrieval.
+This document outlines a phased approach to integrate Retrieval-Augmented Generation (RAG) into the Triton AI Chat system using VLM2Vec embeddings for multimodal (text + image) retrieval.
 
 ## Architecture Goals
-- Store DSA learning materials (algorithms, code examples, diagrams) in vector database
+- Store knowledge materials (documents, code examples, diagrams) in vector database
 - Use VLM2Vec to create multimodal embeddings
 - Enhance Qwen3-VL responses with relevant retrieved context
-- Support both text and visual algorithm explanations
+- Support both text and visual explanations
 
 ---
 
@@ -101,7 +101,7 @@ class EmbeddingService:
 
 ## Phase 3: Knowledge Base Creation (Week 3-4)
 
-### 3.1 Curate DSA Learning Materials
+### 3.1 Curate Knowledge Base
 **Content Sources:**
 - Algorithm explanations (sorting, searching, graphs, trees, DP)
 - Code implementations (Python, Java, C++)
@@ -138,7 +138,7 @@ class VectorStore:
 ```
 
 **Tasks:**
-- [ ] Curate initial DSA knowledge base (20-30 algorithms)
+- [ ] Curate initial knowledge base (20-30 documents)
 - [ ] Implement ingestion pipeline
 - [ ] Create vector store interface
 - [ ] Populate ChromaDB with initial knowledge
@@ -273,7 +273,7 @@ async def search_knowledge(query: str, top_k: int = 5):
 - Add retrieval metrics/logging
 
 ### 7.2 Evaluation & Quality
-- Create test set of DSA questions
+- Create test set of questions for knowledge retrieval
 - Measure retrieval precision/recall
 - A/B test RAG vs non-RAG responses
 - Collect user feedback
@@ -326,7 +326,7 @@ async def search_knowledge(query: str, top_k: int = 5):
 
 ### Prompt Engineering for RAG
 ```
-System: You are a DSA tutor. Use the provided context to answer questions accurately.
+System: You are a helpful AI assistant. Use the provided context to answer questions accurately.
 
 Context:
 [Retrieved chunks here]
@@ -367,7 +367,7 @@ User: [question]
 
 ### Storage
 - **Vector DB**: ~1-2GB for 10k chunks
-- **Raw documents**: ~500MB for comprehensive DSA library
+- **Raw documents**: ~500MB for comprehensive knowledge library
 - **Model weights**: 4-5GB for VLM2Vec (if separate)
 
 ### Compute

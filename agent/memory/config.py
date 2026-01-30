@@ -39,7 +39,7 @@ class QdrantConfig:
     prefer_grpc: bool = True  # gRPC is faster than HTTP
     
     # Collection settings
-    collection_name: str = "dsa_knowledge"
+    collection_name: str = "knowledge_base"
     vector_size: int = 4096  # Must match embedding dimension
     distance: str = "Cosine"  # Options: Cosine, Euclid, Dot
     

@@ -55,7 +55,7 @@ docker compose down
 ### Check Health Status
 ```bash
 docker compose ps
-docker inspect dsa-agent-triton --format='{{.State.Health.Status}}'
+docker inspect triton-ai-server --format='{{.State.Health.Status}}'
 ```
 
 ## Service Ports
