@@ -1,53 +1,52 @@
-# DSA Agent - Data Structures & Algorithms Learning Platform
+# Triton AI Chat Assistant - Production-Ready Inference Platform
 
-**DSA Agent** is an agentic VS Code extension for mastering data structures and algorithms. It brings AI-powered learning directly into your editor, supporting competitive programming, technical interview prep, and algorithm mastery.
+**Triton AI Chat** is a generic AI-powered VS Code extension for real-time AI assistance. It brings high-performance inference directly into your editor, with support for text generation, embedding extraction, batch processing, and multimodal input.
 
-Built with [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), a powerful multimodal AI model running on GPU-accelerated inference with 4-bit quantization for efficiency.
+Built with [Qwen3-VL](https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct), a powerful multimodal AI model running on GPU-accelerated inference with 4-bit quantization for efficiency, deployed via NVIDIA Triton Inference Server.
 
-> ⚠️ **Learning Opportunity**: This project demonstrates building intelligent AI-powered VS Code extensions with disaggregated REST API backends, enabling multi-client support and scalable inference.
+> ⚠️ **Platform**: This project demonstrates building intelligent AI-powered VS Code extensions with scalable REST API backends, enabling multi-client support and distributed inference.
 
 > 📝 **Note**: This README is AI-generated. Cleanup for ambiguous and vague information is pending. Please take it with a grain of salt and report any inaccuracies.
 
 ---
 
-## 🎉 Recent Updates (January 28, 2026)
+## 🎉 Recent Updates (January 30, 2026)
 
-### VS Code Extension - Triton Integration ✅
-The DSA Agent VS Code extension has been fully integrated with NVIDIA Triton Inference Server:
+### VS Code Extension - Generalized Triton Integration ✅
+The Triton AI Chat VS Code extension has been fully generalized from DSA-specific to generic AI use cases:
 
 **What's New:**
+- ✅ Generic AI chat assistant branding
 - ✅ Direct Triton HTTP API integration (`/v2/models/qwen3-vl/infer`)
+- ✅ Mode parameter support (generate/embed)
+- ✅ Batch inference capability (up to 32 concurrent requests)
 - ✅ Real-time server and model health monitoring
-- ✅ Immediate user message display (no more waiting to see your input!)
-- ✅ Loading indicator ("⏳ Processing...") while waiting for response
+- ✅ Immediate user message display with loading indicator
 - ✅ Input disabled during inference to prevent duplicate requests
-- ✅ Performance metrics showing both model and total roundtrip time
-- ✅ Message history limited to 100 messages (prevents memory issues)
-- ✅ Console logging for debugging (Webview DevTools)
+- ✅ Performance metrics showing model and total roundtrip time
+- ✅ Message history limited to 100 messages
+- ✅ Console logging for debugging
 
 **Files:** `agent/client/extensions/vscode/`  
-**Package:** `dsa-agent-0.1.0.vsix` (12.38KB)  
-**Install:** `code --install-extension dsa-agent-0.1.0.vsix --force`
+**Name:** `triton-ai-chat` (v0.2.0)  
+**Command:** `Triton AI: Open Chat Assistant`
+
+### Triton Model - Batch Inference ✅
+Complete batch processing support with proper request/response tensor handling:
+
+**Implemented:**
+- ✅ Batch processing for up to 32 concurrent requests
+- ✅ Proper tensor batching in execute() method
+- ✅ Mode parameter for generate vs embed inference
+- ✅ Embedding extraction with L2 normalization
+- ✅ Dynamic batching with preferred sizes [16, 32]
+- ✅ Comprehensive error handling
+
+**Files:** `agent/serving/triton/models/qwen3-vl/`  
+**Docs:** [TRITON_INTEGRATION_SUMMARY.md](TRITON_INTEGRATION_SUMMARY.md)
 
 ### RAG System - Phase 1 Complete ✅
 Complete RAG (Retrieval-Augmented Generation) infrastructure ready for Phase 2 integration:
-
-**Implemented:**
-- ✅ Qdrant vector database with scalar quantization (INT8, 75% storage reduction)
-- ✅ Redis caching layer (512MB, LRU eviction, TTL=3600s)
-- ✅ Token-aware document chunking (300 tokens text, 500 tokens code)
-- ✅ VLM2Vec embeddings using Qwen3-VL hidden states (4096 dims)
-- ✅ Async retrieval with optional reranking
-- ✅ Docker services configured (Qdrant port 6333, Redis port 6379)
-- ✅ Comprehensive documentation
-
-**Not Yet Done (Phase 2):**
-- ⏳ API integration with inference_engine.py
-- ⏳ /chat/rag, /knowledge/search, /knowledge/ingest endpoints
-- ⏳ DSA knowledge base ingestion
-
-**Files:** `agent/memory/`  
-**Docs:** [VLM2VEC_EMBEDDING_GUIDE.md](docs/VLM2VEC_EMBEDDING_GUIDE.md)
 
 ### Performance Analysis 📊
 - ⚠️ Identified slow inference issue (~100s with max_new_tokens=512)
