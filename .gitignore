@@ -10,3 +10,30 @@ env/
 # Logs
 *.log
 logs/
+
+# Certificates and keys
+*.pem
+*.crt
+*.key
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+certs/
+certificates/
+
+# Data directories
+data/
+
+# Rust build artifacts
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# MCP Agent Output
+tools_catalog_*.json
+tools_index_*.md
+tools_summary_*.yaml
