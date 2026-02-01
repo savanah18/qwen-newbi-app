@@ -1,7 +1,20 @@
-# RAG Integration Plan with VLM2Vec Embeddings
+# ⚠️ DEPRECATED: RAG Integration Plan
 
-## Overview
-This document outlines a phased approach to integrate Retrieval-Augmented Generation (RAG) into the Triton AI Chat system using VLM2Vec embeddings for multimodal (text + image) retrieval.
+**Status:** DEPRECATED as of February 1, 2026
+
+**Replacement:** See [MCP Tool Discovery & Integration](#) for current Kubernetes management approach.
+
+---
+
+## Previous Overview (Archived)
+This document outlined a phased approach to integrate Retrieval-Augmented Generation (RAG) into the Triton AI Chat system using VLM2Vec embeddings for multimodal (text + image) retrieval.
+
+## Migration Notes
+- ✅ Kubernetes resource sync driver active (K8sResourceCollector in Rust)
+- ✅ Real-time vector DB updates implemented (Qdrant)
+- ✅ MCP tool discovery completed (22 Kubernetes tools)
+- 🔄 LLM agent integration for tool orchestration in progress
+- 🔄 VLM2Vec embedding pipeline deferred (focus on tool-based operations first)
 
 ## Architecture Goals
 - Store knowledge materials (documents, code examples, diagrams) in vector database

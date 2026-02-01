@@ -1,8 +1,8 @@
 # Triton AI Chat - Production-Ready Inference Platform
 
-> An intelligent **AI-powered VS Code assistant** with Triton Inference Server, Qdrant Vector DB, and real-time Kubernetes synchronization.
+> An intelligent **AI-powered VS Code assistant** with Triton Inference Server, Qdrant Vector DB, real-time Kubernetes synchronization, and **Model Context Protocol (MCP) tool orchestration**.
 
-**Status:** ✅ Production-Ready | **Latest:** January 31, 2026
+**Status:** ✅ Production-Ready | **Latest:** February 1, 2026
 
 
 ## Quick Start
@@ -24,12 +24,16 @@ Then open VS Code → Command Palette → `Triton AI: Open Chat Assistant`
 
 ---
 
-## What's New (Jan 31, 2026)
+## What's New (Feb 1, 2026)
 
-| Feature | Description |
-|---------|-------------|
-| **K8s Sync Driver** | Real-time Kubernetes resource monitoring with deterministic deduplication |
-| **Triton Embeddings** | Production-grade batch embeddings (50-100 items/sec) |
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **MCP Tool Discovery** | ✅ Complete | 22 Kubernetes management tools discovered and cataloged |
+| **Python MCP Client** | ✅ Complete | HTTP-based session management with tool discovery |
+| **Rust MCP Client** | ✅ Complete | Async/tokio implementation with feature parity to Python |
+| **LLM Agent Integration** | 🔄 In Progress | System prompts with tool schemas ready for LLM injection |
+| **K8s Sync Driver** | ✅ Active | Real-time Kubernetes resource monitoring with deterministic deduplication |
+| **Triton Embeddings** | ✅ Active | Production-grade batch embeddings (50-100 items/sec) |
 
 ---
 

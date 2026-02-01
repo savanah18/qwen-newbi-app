@@ -1,5 +1,57 @@
 # Changelog - Triton AI Chat Development
 
+## February 1, 2026 - Kubernetes MCP Tool Discovery & Rust Client Implementation
+
+### MCP Tool Discovery Agent ✅ COMPLETE
+
+**Python Implementation**
+- Created `/agent/client/mcp_python/mcp_client.py` with session-based HTTP protocol
+- Discovered critical protocol mechanism: `Mcp-Session-Id` header for stateful communication
+- Successfully enumerated 22 Kubernetes management tools
+- Features: colored terminal output, JSON export, rich schema display
+
+**Rust Reimplementation**
+- Rebuilt `/agent/client/mcp/src/main.rs` with proven session ID approach
+- Replaced broken "initialized" method with correct protocol flow
+- Architecture: `MCPDiscoveryAgent` struct with async/tokio execution
+- Result: ✅ 22/22 tools discovered, feature-parity with Python
+
+**MCP Protocol Discovery**
+- ❌ WebSocket not supported (HTTP 400)
+- ✅ HTTP POST with Session ID header is the solution
+- Session flow: Initialize → capture `Mcp-Session-Id` → include in subsequent requests
+- Response format: Server-Sent Events (SSE) with JSON-RPC payloads
+
+**Tool Catalog (22 Kubernetes Management Tools)**
+1. configuration_view - Kubeconfig access
+2. events_list - Cluster events
+3. helm_install/list/uninstall - Helm chart management
+4. namespaces_list - Namespace discovery
+5. nodes_log/stats_summary/top - Node monitoring
+6. pods_delete/exec/get/list/log/run/top - Pod operations
+7. resources_create_or_update/delete/get/list/scale - Generic K8s resources
+
+**LLM Agent Integration Documented**
+- Tool schema format for LLM context injection
+- Multi-turn tool invocation loop
+- Example flows: "List failed pods and restart them"
+- Communication flow diagrams (8 steps from user query to completion)
+
+**Files Created/Modified**
+- Created: `/agent/client/mcp_python/mcp_client.py` (working HTTP client)
+- Created: `/agent/client/mcp_python/test_pods.py` (tool invocation test)
+- Created: `/agent/client/mcp_python/requirements.txt`
+- Modified: `/agent/client/mcp/src/main.rs` (Rust reimplementation)
+- Updated: `.gitignore` (Rust build artifacts)
+
+**Testing**
+- ✅ Python client: 22 tools discovered, pods test passed
+- ✅ Rust client: 22 tools discovered, JSON export validated
+- ✅ Session management: Verified across multiple requests
+- ✅ Tool invocation: Successful pods_list execution
+
+---
+
 ## January 31, 2026 - Documentation Restructuring & Architecture Refinement
 
 ### README Refactored for Clarity ✅

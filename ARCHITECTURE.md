@@ -101,12 +101,77 @@ Thin REST API layer for client communication:
 - Language generation (text)
 - Embedding extraction (4096-dimensional vectors)
 - Multimodal reasoning
+- Tool orchestration via MCP integration
 
 **Inference Modes:**
 1. **Generate**: Text generation for chat responses
 2. **Embed**: Vector extraction for RAG embeddings
+3. **Tool Context**: Kubernetes management with MCP tools (NEW)
 
-### 4. Memory & Retrieval
+### 4. Tool Layer - Kubernetes Management (NEW)
+
+#### MCP (Model Context Protocol) Integration
+
+**Architecture:**
+```
+┌──────────────────────────────┐
+│  Qwen3-VL + Tool Context     │  ← 22 K8s tools in system prompt
+└──────────────────┬───────────┘
+                   │ Structured tool calls
+                   ▼
+          ┌─────────────────────┐
+          │ Tool Executor       │  ← Python/Rust MCP client
+          │ (Validates params)  │
+          └─────────────┬───────┘
+                        │ HTTP + Session ID
+                        ▼
+          ┌──────────────────────────────┐
+          │ kuberntest-mcp-server:8080   │  ← MCP server
+          └─────────────┬────────────────┘
+                        │ kubectl commands
+                        ▼
+          ┌──────────────────────────────┐
+          │ Kubernetes Cluster API       │
+          └──────────────────────────────┘
+```
+
+**Tool Catalog (22 Tools):**
+- Pod operations: list, get, delete, exec, log, run, top
+- Resource management: create, update, delete, get, list, scale
+- Cluster monitoring: nodes (log, stats, top), events
+- Helm charts: install, list, uninstall
+- Configuration: kubeconfig access
+
+**MCP Protocol:**
+- HTTP POST with JSON-RPC
+- Session state via `Mcp-Session-Id` header
+- Server-Sent Events (SSE) response format
+- Deterministic parameter validation
+
+**Clients:**
+- Python: `/agent/client/mcp_python/mcp_client.py` (requests library)
+- Rust: `/agent/client/mcp/src/main.rs` (reqwest + tokio)
+
+**Tool Flow Example:**
+```
+User: "Restart all failed pods"
+  ↓
+LLM: "Call pods_list(fieldSelector='status.phase=Failed')"
+  ↓
+Executor: Send to MCP server
+  ↓
+MCP Server: Execute kubectl, return pod list
+  ↓
+LLM: "Call pods_delete for each failed pod"
+  ↓
+Executor: Execute deletions
+  ↓
+LLM: "Verify pods are running"
+  ↓
+Summary: "Successfully restarted 3 pods"
+```
+
+### 5. Memory & Retrieval
 
 #### Embeddings (`agent/memory/embeddings.py`)
 
